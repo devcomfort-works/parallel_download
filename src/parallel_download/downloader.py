@@ -7,7 +7,12 @@ import aiofiles
 
 from .utils import ensure_directory
 from .download_request import DownloadRequest
-from .download_result import DownloadResultType, DownloadSuccess, DownloadFailure
+from .download_result import (
+    DownloadResultType,
+    DownloadSuccess,
+    DownloadFailure,
+    PreviewResult,
+)
 from .errors import HTTPError, DownloadTimeoutError, NetworkError, FileWriteError
 from .config import TimeoutRecipe, DOWNLOAD_RECIPES
 
@@ -101,6 +106,71 @@ class Downloader:
                 self._download_single(session, semaphore, req) for req in request_list
             ]
             results = await asyncio.gather(*tasks, return_exceptions=False)
+
+        return results
+
+    async def download_dry(
+        self, requests: Iterable[DownloadRequest]
+    ) -> list[PreviewResult]:
+        """
+        Preview download requests without performing actual downloads.
+
+        Validates all download requests and returns preview results.
+        Useful for checking if URLs and filenames are valid before
+        starting actual downloads.
+
+        Parameters
+        ----------
+        requests : Iterable[DownloadRequest]
+            Download requests to preview
+
+        Returns
+        -------
+        list[PreviewResult]
+            List of preview results with validation status for each request
+
+        Examples
+        --------
+        >>> downloader = Downloader(out_dir=Path("./downloads"))
+        >>> requests = [
+        ...     DownloadRequest(url="https://example.com/file.pdf", filename="file.pdf"),
+        ...     DownloadRequest(url="https://example.com/data.csv", filename="data.csv"),
+        ... ]
+        >>> previews = await downloader.download_dry(requests)
+        >>> for preview in previews:
+        ...     if preview.status == "valid":
+        ...         print(f"✓ {preview.filename}")
+        ...     else:
+        ...         print(f"✗ {preview.filename}: {preview.reason}")
+        """
+        request_list = list(requests)
+        results = []
+
+        for req in request_list:
+            try:
+                # DownloadRequest.__post_init__ already validates URL
+                # Additional filename validation
+                if "/" in req.filename or "\\" in req.filename:
+                    raise ValueError("Filename cannot contain path separators")
+
+                results.append(
+                    PreviewResult(
+                        url=req.url,
+                        filename=req.filename,
+                        status="valid",
+                    )
+                )
+            except Exception as e:
+                # Extract filename safely for error reporting
+                filename = getattr(req, "filename", "unknown")
+                results.append(
+                    PreviewResult(
+                        url=req.url,
+                        filename=filename,
+                        status="invalid",
+                        reason=str(e),
+                    )
+                )
 
         return results
 

@@ -74,5 +74,31 @@ class DownloadFailure(DownloadResult):
             raise ValueError("error must be provided for DownloadFailure")
 
 
+@dataclass
+class PreviewResult:
+    """
+    Preview result for download request validation.
+
+    Represents the validation status of a download request without
+    performing actual download operations.
+
+    Attributes
+    ----------
+    url : str
+        The URL to be downloaded.
+    filename : str
+        The target filename for the download.
+    status : Literal["valid", "invalid"]
+        The validation status of the request.
+    reason : str, optional
+        Error message if status is "invalid". None if valid.
+    """
+
+    url: str
+    filename: str
+    status: Literal["valid", "invalid"]
+    reason: str | None = None
+
+
 # Type alias for download result
 DownloadResultType = Union[DownloadSuccess, DownloadFailure]

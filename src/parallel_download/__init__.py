@@ -2,7 +2,7 @@
 
 from .downloader import Downloader
 from .download_request import DownloadRequest
-from .download_result import DownloadSuccess, DownloadFailure, DownloadResultType
+from .download_result import DownloadSuccess, DownloadFailure, DownloadResultType, PreviewResult
 from .config import TimeoutRecipe, DownloadConfig, DOWNLOAD_RECIPES
 from .errors import (
     FilenameExtractionError,
@@ -22,6 +22,7 @@ __all__ = [
     "DownloadSuccess",
     "DownloadFailure",
     "DownloadResultType",
+    "PreviewResult",
     # Configuration
     "TimeoutRecipe",
     "DownloadConfig",

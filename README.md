@@ -499,6 +499,9 @@ parallel-download/
 │   ├── test_downloader.py   # Downloader tests
 │   ├── test_download_request.py # DownloadRequest tests
 │   └── test_utils.py        # Utils tests
+├── examples/                # Example scripts
+│   ├── __init__.py
+│   └── download_dry_preview.py  # dry_run preview with tabulate
 ├── pyproject.toml           # Project configuration
 ├── README.md               # This file
 └── TESTING.md              # Testing guide
@@ -513,6 +516,78 @@ parallel-download/
 5. Commit your changes (`git commit -m 'Add amazing feature'`)
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
+
+## 📚 Examples
+
+### Preview Downloads with dry_run
+
+The library provides a `download_dry` method to preview downloads without performing actual HTTP requests. This is useful for validating requests before batch downloads.
+
+**Example with tabulate output:**
+
+```python
+import asyncio
+from pathlib import Path
+from parallel_download import Downloader, DownloadRequest
+from tabulate import tabulate
+
+async def preview_downloads():
+    downloader = Downloader(out_dir=Path("./downloads"))
+    
+    requests = [
+        DownloadRequest(url="https://example.com/file1.pdf", filename="file1.pdf"),
+        DownloadRequest(url="https://example.com/file2.csv", filename="file2.csv"),
+        DownloadRequest(url="https://example.com/file3.zip", filename="bad/path/file3.zip"),  # Invalid
+    ]
+    
+    # Preview without downloading
+    previews = await downloader.download_dry(requests)
+    
+    # Prepare table data
+    table_data = []
+    for preview in previews:
+        status_icon = "✓" if preview.status == "valid" else "✗"
+        reason = preview.reason if preview.reason else "-"
+        table_data.append([
+            status_icon,
+            preview.filename,
+            preview.status.upper(),
+            reason,
+        ])
+    
+    # Display results
+    print(tabulate(
+        table_data,
+        headers=["Status", "Filename", "Validation", "Error/Notes"],
+        tablefmt="grid"
+    ))
+
+asyncio.run(preview_downloads())
+```
+
+**Output:**
+```
+┌────────┬──────────────────────┬────────────┬──────────────────────────────────┐
+│ Status │ Filename             │ Validation │ Error/Notes                      │
+├────────┼──────────────────────┼────────────┼──────────────────────────────────┤
+│ ✓      │ file1.pdf            │ VALID      │ -                                │
+│ ✓      │ file2.csv            │ VALID      │ -                                │
+│ ✗      │ bad/path/file3.zip   │ INVALID    │ Filename cannot contain path ... │
+└────────┴──────────────────────┴────────────┴──────────────────────────────────┘
+```
+
+For more comprehensive examples, see the `examples/download_dry_preview.py` file:
+
+```bash
+pip install tabulate
+python examples/download_dry_preview.py
+```
+
+This demonstrates:
+- Basic dry_run preview with table output
+- Batch processing and reporting
+- Filtering valid/invalid requests
+- Summary statistics
 
 ## 📝 License
 
