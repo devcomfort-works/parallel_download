@@ -57,5 +57,7 @@ typing-extensions==4.15.0
     # via typing-inspection
 typing-inspection==0.4.2
     # via pydantic
+wcwidth==0.2.14
+    # via parallel-download
 yarl==1.22.0
     # via aiohttp
