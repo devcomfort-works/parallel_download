@@ -1,16 +1,16 @@
 """Core error classes for parallel_download."""
 
-from .extraction_errors import (
-    FilenameExtractionError,
-    NoPathInURLError,
-    DirectoryPathError,
-)
 from .download_errors import (
     DownloadError,
-    HTTPError,
     DownloadTimeoutError,
-    NetworkError,
     FileWriteError,
+    HTTPError,
+    NetworkError,
+)
+from .extraction_errors import (
+    DirectoryPathError,
+    FilenameExtractionError,
+    NoPathInURLError,
 )
 from .validation_errors import (
     BulkValidationError,

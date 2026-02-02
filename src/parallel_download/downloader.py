@@ -8,25 +8,24 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Union
 
-import aiohttp
 import aiofiles  # type: ignore
+import aiohttp
 
-from .config import DOWNLOAD_RECIPES, TimeoutRecipe
-from .models import (
-    DownloadInput,
-    DownloadResultType,
-    DownloadRequest,
-    DownloadSuccess,
-    DownloadFailure,
-)
 from .errors import (
     DownloadTimeoutError,
     FileWriteError,
     HTTPError,
     NetworkError,
 )
-from .url_processor import RequestParser
 from .filesystem.directory import Directory
+from .models import (
+    DownloadFailure,
+    DownloadInput,
+    DownloadRequest,
+    DownloadResultType,
+    DownloadSuccess,
+)
+from .url_processor import RequestParser
 
 
 class Downloader:
@@ -54,7 +53,7 @@ class Downloader:
     def __init__(
         self,
         out_dir: Union[str, Path],
-        timeout: Union[TimeoutRecipe, int] = "BALANCED",
+        timeout: int = 60,
         max_concurrent: int = 5,
     ):
         """
@@ -66,14 +65,10 @@ class Downloader:
         out_dir : Union[str, Path]
             Output directory for downloaded files.
             다운로드된 파일이 저장될 디렉토리입니다.
-        timeout : Union[TimeoutRecipe, int], optional
-            HTTP request timeout. Can be a recipe name or seconds.
-            HTTP 요청 제한 시간입니다. 레시피 이름이나 초 단위 숫자를 사용할 수 있습니다.
-            Recipe options:
-            - "FOR_LARGE_FILES": 300s (5 min)
-            - "BALANCED": 60s (1 min)
-            - "FOR_SMALL_FILES": 15s
-            Default is "BALANCED".
+        timeout : int, optional
+            HTTP request timeout in seconds.
+            HTTP 요청 제한 시간(초)입니다.
+            Default is 60.
         max_concurrent : int, optional
             Maximum number of concurrent downloads. Must be positive.
             최대 동시 다운로드 수입니다. 양수여야 합니다.
@@ -82,23 +77,15 @@ class Downloader:
         Raises
         ------
         ValueError
-            If timeout recipe is invalid, or if timeout/max_concurrent are invalid.
-            타임아웃 레시피가 유효하지 않거나, 타임아웃/최대 동시성 값이 유효하지 않은 경우 발생합니다.
+            If timeout or max_concurrent are invalid.
+            타임아웃 또는 최대 동시성 값이 유효하지 않은 경우 발생합니다.
         """
         self.out_dir = Path(out_dir)
 
-        # Resolve timeout from recipe or use direct value
-        if isinstance(timeout, str):
-            if timeout not in DOWNLOAD_RECIPES:
-                raise ValueError(
-                    f"Invalid timeout recipe: {timeout}. "
-                    f"Available recipes: {', '.join(DOWNLOAD_RECIPES.keys())}"
-                )
-            self.timeout = DOWNLOAD_RECIPES[timeout].timeout
-        else:
-            if not isinstance(timeout, int) or timeout <= 0:
-                raise ValueError(f"timeout must be a positive integer, got {timeout}")
-            self.timeout = timeout
+        # Validate timeout
+        if not isinstance(timeout, int) or timeout <= 0:
+            raise ValueError(f"timeout must be a positive integer, got {timeout}")
+        self.timeout = timeout
 
         # Validate max_concurrent
         if not isinstance(max_concurrent, int) or max_concurrent <= 0:
@@ -213,25 +200,25 @@ class Downloader:
                     )
 
         except asyncio.TimeoutError:
-            error = DownloadTimeoutError(url_str, self.timeout)
+            timeout_error = DownloadTimeoutError(url_str, self.timeout)
             return DownloadFailure(
                 url=url_str,
                 filename=request.filename,
-                error=str(error),
+                error=str(timeout_error),
             )
         except aiohttp.ClientError as e:
-            error = NetworkError(url_str, e)
+            network_error = NetworkError(url_str, e)
             return DownloadFailure(
                 url=url_str,
                 filename=request.filename,
-                error=str(error),
+                error=str(network_error),
             )
         except (IOError, OSError) as e:
-            error = FileWriteError(request.filename, e)
+            write_error = FileWriteError(request.filename, e)
             return DownloadFailure(
                 url=url_str,
                 filename=request.filename,
-                error=str(error),
+                error=str(write_error),
             )
         except Exception as e:
             return DownloadFailure(

@@ -15,34 +15,15 @@ from parallel_download.errors import BulkValidationError
 class TestDownloaderInitializationValidation:
     """Tests for Downloader initialization parameter validation."""
 
-    def test_downloader_with_balanced_recipe(self, temp_download_dir: Path):
-        """Test Downloader initialization with BALANCED timeout recipe."""
+    def test_downloader_default_timeout(self, temp_download_dir: Path):
+        """Test Downloader initialization with default timeout."""
         downloader = Downloader(
             out_dir=temp_download_dir,
-            timeout="BALANCED",
             max_concurrent=5,
         )
 
-        assert downloader.timeout == 60  # BALANCED = 60s
+        assert downloader.timeout == 60  # Default = 60s
         assert downloader.max_concurrent == 5
-
-    def test_downloader_with_large_files_recipe(self, temp_download_dir: Path):
-        """Test Downloader with FOR_LARGE_FILES recipe."""
-        downloader = Downloader(
-            out_dir=temp_download_dir,
-            timeout="FOR_LARGE_FILES",
-        )
-
-        assert downloader.timeout == 300  # 5 minutes
-
-    def test_downloader_with_small_files_recipe(self, temp_download_dir: Path):
-        """Test Downloader with FOR_SMALL_FILES recipe."""
-        downloader = Downloader(
-            out_dir=temp_download_dir,
-            timeout="FOR_SMALL_FILES",
-        )
-
-        assert downloader.timeout == 15
 
     def test_downloader_with_custom_timeout(self, temp_download_dir: Path):
         """Test Downloader initialization with custom timeout value."""
@@ -54,14 +35,6 @@ class TestDownloaderInitializationValidation:
 
         assert downloader.timeout == 120
         assert downloader.max_concurrent == 3
-
-    def test_downloader_invalid_timeout_recipe(self, temp_download_dir: Path):
-        """Test Downloader with invalid timeout recipe name."""
-        with pytest.raises(ValueError) as exc_info:
-            Downloader(out_dir=temp_download_dir, timeout="INVALID_RECIPE")
-
-        assert "Invalid timeout recipe" in str(exc_info.value)
-        assert "INVALID_RECIPE" in str(exc_info.value)
 
     def test_downloader_negative_timeout(self, temp_download_dir: Path):
         """Test Downloader with negative timeout value."""

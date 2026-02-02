@@ -26,9 +26,7 @@ class HTTPError(DownloadError):
     def __init__(self, url: str, status_code: int):
         self.url = url
         self.status_code = status_code
-        super().__init__(
-            f"HTTP download failed with status {status_code} for URL: {url}"
-        )
+        super().__init__(f"HTTP download failed with status {status_code} for URL: {url}")
 
 
 class DownloadTimeoutError(DownloadError):
@@ -66,9 +64,7 @@ class NetworkError(DownloadError):
     def __init__(self, url: str, original_error: Exception):
         self.url = url
         self.original_error = original_error
-        super().__init__(
-            f"Network error occurred while downloading {url}: {original_error}"
-        )
+        super().__init__(f"Network error occurred while downloading {url}: {original_error}")
 
 
 class FileWriteError(DownloadError):

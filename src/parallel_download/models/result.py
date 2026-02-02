@@ -43,7 +43,8 @@ Using types for pattern matching or validation:
 'success'
 """
 
-from typing import Union, Literal, Annotated
+from typing import Annotated, Literal, Union
+
 from pydantic import BaseModel, Field
 
 

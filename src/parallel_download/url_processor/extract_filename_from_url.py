@@ -1,6 +1,7 @@
-from urllib.parse import urlparse, unquote
 from pathlib import Path
-from ..errors import NoPathInURLError, DirectoryPathError
+from urllib.parse import unquote, urlparse
+
+from ..errors import DirectoryPathError, NoPathInURLError
 
 
 def extract_filename_from_url(url: str) -> str:

@@ -1,9 +1,9 @@
-from .request import DownloadRequest, DownloadInput
+from .request import DownloadInput, DownloadRequest
 from .result import (
-    DownloadSuccess,
     DownloadFailure,
-    DownloadResultType,
     DownloadResult,
+    DownloadResultType,
+    DownloadSuccess,
 )
 
 __all__ = [

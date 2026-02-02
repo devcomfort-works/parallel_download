@@ -1,6 +1,7 @@
-from typing import Union, List
-from ..models import DownloadInput, DownloadRequest
+from typing import List, Union
+
 from ..errors import BulkValidationError
+from ..models import DownloadInput, DownloadRequest
 
 
 class RequestParser:
@@ -85,9 +86,7 @@ class RequestParser:
                 validated_requests.append(result)
 
         if errors:
-            raise BulkValidationError(
-                f"Validation failed for {len(errors)} requests", errors
-            )
+            raise BulkValidationError(f"Validation failed for {len(errors)} requests", errors)
 
         return validated_requests
 
