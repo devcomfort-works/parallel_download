@@ -38,7 +38,8 @@ pip install parallel-download
 ```python
 import asyncio
 from pathlib import Path
-from parallel_download import Downloader, DownloadRequest
+from parallel_download.downloader import Downloader
+from parallel_download.models import DownloadRequest
 
 async def main():
     # Create downloader with BALANCED timeout (60 seconds)
@@ -47,7 +48,7 @@ async def main():
         timeout="BALANCED",
         max_concurrent=5
     )
-    
+
     # Create download requests
     requests = [
         DownloadRequest(
@@ -59,10 +60,10 @@ async def main():
             filename="file2.pdf"
         ),
     ]
-    
+
     # Download in parallel
     results = await downloader.download(requests)
-    
+
     # Process results
     for result in results:
         if result.status == "success":
@@ -80,7 +81,7 @@ The library extracts filenames from URLs automatically, but raises explicit erro
 #### ✅ Valid Cases (Automatically Extracted)
 
 ```python
-from parallel_download import DownloadRequest
+from parallel_download.models import DownloadRequest
 
 # Simple filename extraction
 request = DownloadRequest(url="https://example.com/documents/report.pdf")
@@ -100,7 +101,7 @@ print(request.filename)  # Output: archive.backup.2024.tar.gz
 The following cases raise errors to force explicit handling:
 
 ```python
-from parallel_download import DownloadRequest
+from parallel_download.models import DownloadRequest
 from parallel_download.errors import NoPathInURLError, DirectoryPathError
 
 # No path in URL - raises NoPathInURLError
@@ -138,7 +139,9 @@ print(request.filename)  # Output: data.zip
 Choose the appropriate recipe based on your file sizes:
 
 #### FOR_LARGE_FILES (300 seconds / 5 minutes)
+
 Use for downloading large files (several GB to tens of GB):
+
 ```python
 downloader = Downloader(
     out_dir=Path("./large_files"),
@@ -148,7 +151,9 @@ downloader = Downloader(
 ```
 
 #### BALANCED (60 seconds / 1 minute)
+
 Default recipe for mixed file sizes:
+
 ```python
 downloader = Downloader(
     out_dir=Path("./downloads"),
@@ -158,7 +163,9 @@ downloader = Downloader(
 ```
 
 #### FOR_SMALL_FILES (15 seconds)
+
 Use for downloading small files (KB-MB range):
+
 ```python
 downloader = Downloader(
     out_dir=Path("./small_files"),
@@ -170,6 +177,7 @@ downloader = Downloader(
 ### Custom Timeout Values
 
 Specify timeout in seconds directly:
+
 ```python
 downloader = Downloader(
     out_dir=Path("./downloads"),
@@ -183,11 +191,13 @@ downloader = Downloader(
 Handle different error scenarios with custom exceptions:
 
 ```python
-from parallel_download import (
-    Downloader,
+from parallel_download.downloader import Downloader
+from parallel_download.models import (
     DownloadRequest,
     DownloadSuccess,
     DownloadFailure,
+)
+from parallel_download.errors import (
     HTTPError,
     DownloadTimeoutError,
     NetworkError,
@@ -195,13 +205,13 @@ from parallel_download import (
 
 async def download_with_error_handling():
     downloader = Downloader(out_dir=Path("./downloads"))
-    
+
     requests = [
         DownloadRequest(url="https://example.com/file.pdf", filename="file.pdf"),
     ]
-    
+
     results = await downloader.download(requests)
-    
+
     for result in results:
         if isinstance(result, DownloadSuccess):
             print(f"Downloaded: {result.file_path}")
@@ -231,26 +241,26 @@ class Downloader:
     ) -> None:
         """
         Initialize the parallel downloader.
-        
+
         Args:
             out_dir: Output directory for downloaded files
             timeout: Timeout recipe or seconds (must be positive)
             max_concurrent: Maximum concurrent downloads (must be positive)
-            
+
         Raises:
             ValueError: If timeout or max_concurrent are invalid
         """
-    
+
     async def download(
-        self, 
+        self,
         requests: Iterable[DownloadRequest]
     ) -> list[DownloadSuccess | DownloadFailure]:
         """
         Download files in parallel.
-        
+
         Args:
             requests: Iterable of DownloadRequest objects
-            
+
         Returns:
             List of download results (success or failure)
         """
@@ -265,7 +275,7 @@ Request object for a single file download.
 class DownloadRequest:
     url: str                      # Download URL
     filename: Optional[str] = None # Target filename (auto-extracted if None)
-    
+
     # Raises:
     # - NoPathInURLError: If URL has no path
     # - DirectoryPathError: If URL path is a directory
@@ -330,7 +340,8 @@ class FileWriteError(DownloadError)
 ```python
 import asyncio
 from pathlib import Path
-from parallel_download import Downloader, DownloadRequest, DownloadSuccess, DownloadFailure
+from parallel_download.downloader import Downloader
+from parallel_download.models import DownloadRequest, DownloadSuccess, DownloadFailure
 
 async def download_with_progress():
     downloader = Downloader(
@@ -338,24 +349,24 @@ async def download_with_progress():
         timeout="BALANCED",
         max_concurrent=5
     )
-    
+
     urls = [
         ("https://example.com/file1.pdf", "file1.pdf"),
         ("https://example.com/file2.pdf", "file2.pdf"),
         ("https://example.com/file3.pdf", "file3.pdf"),
     ]
-    
+
     requests = [
         DownloadRequest(url=url, filename=filename)
         for url, filename in urls
     ]
-    
+
     results = await downloader.download(requests)
-    
+
     # Summary
     successes = [r for r in results if isinstance(r, DownloadSuccess)]
     failures = [r for r in results if isinstance(r, DownloadFailure)]
-    
+
     print(f"\n✓ Downloaded: {len(successes)}/{len(results)}")
     if failures:
         print(f"✗ Failed: {len(failures)}")
@@ -375,17 +386,17 @@ async def batch_download(file_size_category: str):
         "medium": "BALANCED",
         "large": "FOR_LARGE_FILES",
     }
-    
+
     downloader = Downloader(
         out_dir=Path(f"./downloads/{file_size_category}"),
         timeout=recipe_map[file_size_category],
     )
-    
+
     requests = [
         DownloadRequest(url=f"https://example.com/{i}.bin", filename=f"file_{i}.bin")
         for i in range(10)
     ]
-    
+
     results = await downloader.download(requests)
     return results
 
@@ -396,7 +407,7 @@ asyncio.run(batch_download("large"))
 ### Error Recovery with Retry Logic
 
 ```python
-from parallel_download import NetworkError, HTTPError
+from parallel_download.errors import NetworkError, HTTPError
 
 async def download_with_retry(url: str, filename: str, max_retries: int = 3):
     for attempt in range(max_retries):
@@ -405,10 +416,10 @@ async def download_with_retry(url: str, filename: str, max_retries: int = 3):
             result = (await downloader.download([
                 DownloadRequest(url=url, filename=filename)
             ]))[0]
-            
+
             if isinstance(result, DownloadSuccess):
                 return result
-            
+
             # Retry on network errors
             if "Network error" in result.error or "timeout" in result.error.lower():
                 if attempt < max_retries - 1:
@@ -416,9 +427,9 @@ async def download_with_retry(url: str, filename: str, max_retries: int = 3):
                     print(f"Retry in {wait_time}s...")
                     await asyncio.sleep(wait_time)
                     continue
-            
+
             raise Exception(f"Download failed: {result.error}")
-            
+
         except Exception as e:
             if attempt == max_retries - 1:
                 raise
@@ -465,6 +476,7 @@ rye run pytest -vv
 ### Test Coverage
 
 The project includes 77 comprehensive tests:
+
 - **23 tests** for `DownloadRequest` (filename extraction, URL parsing, error handling)
 - **9 tests** for `Downloader` initialization validation (recipe validation, parameter checks)
 - **45 tests** for `Downloader` functionality (basic downloads, parallel downloads, full-factorial tests, edge cases)
@@ -528,21 +540,22 @@ The library provides a `download_dry` method to preview downloads without perfor
 ```python
 import asyncio
 from pathlib import Path
-from parallel_download import Downloader, DownloadRequest
+from parallel_download.downloader import Downloader
+from parallel_download.models import DownloadRequest
 from tabulate import tabulate
 
 async def preview_downloads():
     downloader = Downloader(out_dir=Path("./downloads"))
-    
+
     requests = [
         DownloadRequest(url="https://example.com/file1.pdf", filename="file1.pdf"),
         DownloadRequest(url="https://example.com/file2.csv", filename="file2.csv"),
         DownloadRequest(url="https://example.com/file3.zip", filename="bad/path/file3.zip"),  # Invalid
     ]
-    
+
     # Preview without downloading
     previews = await downloader.download_dry(requests)
-    
+
     # Prepare table data
     table_data = []
     for preview in previews:
@@ -554,7 +567,7 @@ async def preview_downloads():
             preview.status.upper(),
             reason,
         ])
-    
+
     # Display results
     print(tabulate(
         table_data,
@@ -566,6 +579,7 @@ asyncio.run(preview_downloads())
 ```
 
 **Output:**
+
 ```
 ┌────────┬──────────────────────┬────────────┬──────────────────────────────────┐
 │ Status │ Filename             │ Validation │ Error/Notes                      │
@@ -584,6 +598,7 @@ python examples/download_dry_preview.py
 ```
 
 This demonstrates:
+
 - Basic dry_run preview with table output
 - Batch processing and reporting
 - Filtering valid/invalid requests
@@ -596,6 +611,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 👤 Author
 
 **DevComfort**
+
 - GitHub: [@devcomfort](https://github.com/devcomfort)
 - Email: im@devcomfort.me
 
@@ -608,4 +624,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 📞 Support
 
 For issues, questions, or suggestions, please [open an issue](https://github.com/devcomfort/parallel-download/issues) on GitHub.
-
