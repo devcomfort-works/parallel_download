@@ -4,8 +4,12 @@ import pytest
 from pathlib import Path
 
 from parallel_download.downloader import Downloader
-from parallel_download.download_request import DownloadRequest
-from parallel_download.download_result import DownloadSuccess, DownloadFailure, PreviewResult
+from parallel_download.models import (
+    DownloadRequest,
+    DownloadSuccess,
+    DownloadFailure,
+)
+from parallel_download.errors import BulkValidationError
 
 
 class TestDownloaderInitializationValidation:
@@ -401,52 +405,47 @@ class TestDownloaderEdgeCases:
         assert result.file_path == str(temp_download_dir / "structure_test.bin")
 
 
-class TestDownloaderDryRun:
-    """Tests for download_dry preview functionality."""
+class TestDownloaderValidation:
+    """Tests for Downloader request validation functionality."""
 
     @pytest.mark.asyncio
-    async def test_download_dry_valid_requests(self, temp_download_dir: Path):
-        """Test download_dry with valid requests."""
+    async def test_validate_requests_valid(self, temp_download_dir: Path):
+        """Test validate_requests with all valid requests."""
         downloader = Downloader(out_dir=temp_download_dir)
         requests = [
-            DownloadRequest(url="https://example.com/file1.pdf", filename="file1.pdf"),
-            DownloadRequest(url="https://example.com/file2.csv", filename="file2.csv"),
+            "https://example.com/file1.pdf",
+            {"url": "https://example.com/file2.pdf", "filename": "custom.pdf"},
+            DownloadRequest(url="https://example.com/file3.pdf", filename="file3.pdf"),
         ]
 
-        previews = await downloader.download_dry(requests)
+        valid_reqs = await downloader.validate_requests(requests)
 
-        assert len(previews) == 2
-        assert all(p.status == "valid" for p in previews)
-        assert previews[0].filename == "file1.pdf"
-        assert previews[0].reason is None
-        assert previews[1].filename == "file2.csv"
-        assert previews[1].reason is None
+        assert len(valid_reqs) == 3
+        assert all(isinstance(r, DownloadRequest) for r in valid_reqs)
+        assert valid_reqs[0].filename == "file1.pdf"
+        assert valid_reqs[1].filename == "custom.pdf"
+        assert valid_reqs[2].filename == "file3.pdf"
 
     @pytest.mark.asyncio
-    async def test_download_dry_invalid_filenames(self, temp_download_dir: Path):
-        """Test download_dry with invalid filenames containing path separators."""
+    async def test_validate_requests_invalid_filenames(self, temp_download_dir: Path):
+        """Test validate_requests with invalid filenames containing path separators."""
         downloader = Downloader(out_dir=temp_download_dir)
         requests = [
-            DownloadRequest(url="https://example.com/file1.pdf", filename="file1.pdf"),
-            DownloadRequest(url="https://example.com/file2.pdf", filename="path/file2.pdf"),
-            DownloadRequest(
-                url="https://example.com/file3.pdf", filename="path\\file3.pdf"
-            ),
+            {"url": "https://example.com/file1.pdf", "filename": "file1.pdf"},
+            {"url": "https://example.com/file2.pdf", "filename": "path/file2.pdf"},
+            {"url": "https://example.com/file3.pdf", "filename": "path\\file3.pdf"},
         ]
 
-        previews = await downloader.download_dry(requests)
+        with pytest.raises(BulkValidationError) as excinfo:
+            await downloader.validate_requests(requests)
 
-        assert len(previews) == 3
-        assert previews[0].status == "valid"
-        assert previews[0].reason is None
-        assert previews[1].status == "invalid"
-        assert "path separators" in previews[1].reason
-        assert previews[2].status == "invalid"
-        assert "path separators" in previews[2].reason
+        errors = excinfo.value.exceptions
+        assert len(errors) == 2
+        assert any("path separators" in str(e) for e in errors)
 
     @pytest.mark.asyncio
-    async def test_download_dry_preserves_urls(self, temp_download_dir: Path):
-        """Test that download_dry preserves original URL information."""
+    async def test_validate_requests_preserves_urls(self, temp_download_dir: Path):
+        """Test that validate_requests preserves original URL information."""
         downloader = Downloader(out_dir=temp_download_dir)
         url1 = "https://api.example.com/download?id=123&token=abc"
         url2 = "https://cdn.example.com/files/data.zip"
@@ -455,53 +454,31 @@ class TestDownloaderDryRun:
             DownloadRequest(url=url2, filename="archive.zip"),
         ]
 
-        previews = await downloader.download_dry(requests)
+        valid_reqs = await downloader.validate_requests(requests)
 
-        assert previews[0].url == url1
-        assert previews[1].url == url2
+        assert str(valid_reqs[0].url) == url1
+        assert str(valid_reqs[1].url) == url2
 
     @pytest.mark.asyncio
-    async def test_download_dry_empty_requests(self, temp_download_dir: Path):
-        """Test download_dry with empty request list."""
+    async def test_validate_requests_empty(self, temp_download_dir: Path):
+        """Test validate_requests with empty request list."""
         downloader = Downloader(out_dir=temp_download_dir)
-        previews = await downloader.download_dry([])
+        valid_reqs = await downloader.validate_requests([])
 
-        assert len(previews) == 0
-
-    @pytest.mark.asyncio
-    async def test_download_dry_mixed_valid_invalid(self, temp_download_dir: Path):
-        """Test download_dry with mixed valid and invalid requests."""
-        downloader = Downloader(out_dir=temp_download_dir)
-        requests = [
-            DownloadRequest(url="https://example.com/file1.pdf", filename="file1.pdf"),
-            DownloadRequest(url="https://example.com/file2.pdf", filename="invalid/file2.pdf"),
-            DownloadRequest(url="https://example.com/file3.csv", filename="file3.csv"),
-            DownloadRequest(url="https://example.com/file4.csv", filename="bad\\file4.csv"),
-        ]
-
-        previews = await downloader.download_dry(requests)
-
-        assert len(previews) == 4
-        assert previews[0].status == "valid"
-        assert previews[1].status == "invalid"
-        assert previews[2].status == "valid"
-        assert previews[3].status == "invalid"
+        assert len(valid_reqs) == 0
 
     @pytest.mark.asyncio
-    async def test_download_dry_returns_preview_result_type(
-        self, temp_download_dir: Path
-    ):
-        """Test that download_dry returns PreviewResult objects."""
+    async def test_validate_requests_mixed(self, temp_download_dir: Path):
+        """Test validate_requests with mixed valid and invalid requests."""
         downloader = Downloader(out_dir=temp_download_dir)
         requests = [
-            DownloadRequest(url="https://example.com/file.pdf", filename="file.pdf")
+            {"url": "https://example.com/file1.pdf", "filename": "file1.pdf"},
+            {"url": "https://example.com/file2.pdf", "filename": "invalid/file2.pdf"},
+            {"url": "https://example.com/file3.csv", "filename": "file3.csv"},
+            {"url": "https://example.com/file4.txt", "filename": "invalid\\file4.txt"},
         ]
 
-        previews = await downloader.download_dry(requests)
+        with pytest.raises(BulkValidationError) as excinfo:
+            await downloader.validate_requests(requests)
 
-        assert len(previews) == 1
-        assert isinstance(previews[0], PreviewResult)
-        assert hasattr(previews[0], "url")
-        assert hasattr(previews[0], "filename")
-        assert hasattr(previews[0], "status")
-        assert hasattr(previews[0], "reason")
+        assert len(excinfo.value.exceptions) == 2

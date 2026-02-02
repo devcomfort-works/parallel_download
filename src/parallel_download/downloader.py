@@ -1,58 +1,91 @@
+"""
+Parallel downloader engine.
+병렬 다운로드 엔진입니다.
+"""
+
 import asyncio
-from pathlib import Path
 from collections.abc import Iterable
+from pathlib import Path
+from typing import Union
 
 import aiohttp
-import aiofiles
+import aiofiles  # type: ignore
 
-from .utils import ensure_directory
-from .download_request import DownloadRequest
-from .download_result import (
+from .config import DOWNLOAD_RECIPES, TimeoutRecipe
+from .models import (
+    DownloadInput,
     DownloadResultType,
+    DownloadRequest,
     DownloadSuccess,
     DownloadFailure,
-    PreviewResult,
 )
-from .errors import HTTPError, DownloadTimeoutError, NetworkError, FileWriteError
-from .config import TimeoutRecipe, DOWNLOAD_RECIPES
+from .errors import (
+    DownloadTimeoutError,
+    FileWriteError,
+    HTTPError,
+    NetworkError,
+)
+from .url_processor import RequestParser
+from .filesystem.directory import Directory
 
 
 class Downloader:
+    """
+    Parallel downloader engine that manages multiple download tasks.
+    여러 다운로드 작업을 관리하는 병렬 다운로드 엔진입니다.
+
+    Attributes
+    ----------
+    out_dir : Path
+        Output directory for downloaded files.
+        다운로드된 파일이 저장될 디렉토리입니다.
+    timeout : int
+        HTTP request timeout in seconds.
+        HTTP 요청 제한 시간(초)입니다.
+    max_concurrent : int
+        Maximum number of concurrent downloads.
+        최대 동시 다운로드 수입니다.
+    """
+
     out_dir: Path
     timeout: int
     max_concurrent: int
 
     def __init__(
         self,
-        out_dir: Path,
-        timeout: TimeoutRecipe | int = "BALANCED",
+        out_dir: Union[str, Path],
+        timeout: Union[TimeoutRecipe, int] = "BALANCED",
         max_concurrent: int = 5,
     ):
         """
         Initialize the parallel downloader.
+        병렬 다운로더를 초기화합니다.
 
         Parameters
         ----------
-        out_dir : Path
+        out_dir : Union[str, Path]
             Output directory for downloaded files.
-        timeout : TimeoutRecipe | int, optional
+            다운로드된 파일이 저장될 디렉토리입니다.
+        timeout : Union[TimeoutRecipe, int], optional
             HTTP request timeout. Can be a recipe name or seconds.
+            HTTP 요청 제한 시간입니다. 레시피 이름이나 초 단위 숫자를 사용할 수 있습니다.
             Recipe options:
-            - "FOR_LARGE_FILES": 300s (5 min) for downloading large files
-            - "BALANCED": 60s (1 min) for mixed file sizes
-            - "FOR_SMALL_FILES": 15s for downloading small files
-            Can also specify timeout in seconds as an integer (must be positive).
+            - "FOR_LARGE_FILES": 300s (5 min)
+            - "BALANCED": 60s (1 min)
+            - "FOR_SMALL_FILES": 15s
             Default is "BALANCED".
         max_concurrent : int, optional
             Maximum number of concurrent downloads. Must be positive.
+            최대 동시 다운로드 수입니다. 양수여야 합니다.
             Default is 5.
 
         Raises
         ------
         ValueError
             If timeout recipe is invalid, or if timeout/max_concurrent are invalid.
+            타임아웃 레시피가 유효하지 않거나, 타임아웃/최대 동시성 값이 유효하지 않은 경우 발생합니다.
         """
-        self.out_dir = out_dir
+        self.out_dir = Path(out_dir)
 
         # Resolve timeout from recipe or use direct value
         if isinstance(timeout, str):
@@ -74,174 +107,180 @@ class Downloader:
             )
         self.max_concurrent = max_concurrent
 
-        ensure_directory(self.out_dir)
+        # Global semaphore for async-safe concurrency control
+        # 인스턴스 전체의 동시성을 보장하는 세마포어
+        self._semaphore = asyncio.Semaphore(self.max_concurrent)
+        self._parser = RequestParser()
+        self._dir = Directory(self.out_dir)
+        self._dir.ensure()
 
     async def download(
-        self, requests: Iterable[DownloadRequest]
+        self, requests: Iterable[DownloadInput]
     ) -> list[DownloadResultType]:
         """
         Download files in parallel from the given requests.
+        주어진 요청들에 대해 파일을 병렬로 다운로드합니다.
 
         Parameters
         ----------
-        requests : Iterable[DownloadRequest]
-            Iterable of DownloadRequest objects to download.
+        requests : Iterable[DownloadInput]
+            Iterable of download requests (URL string, dict, or DownloadRequest object).
+            다운로드 요청의 반복 가능한 객체입니다 (URL 문자열, dict, 또는 DownloadRequest 객체).
 
         Returns
         -------
         list[DownloadResultType]
             List of download results (DownloadSuccess or DownloadFailure).
+            다운로드 결과 리스트입니다 (DownloadSuccess 또는 DownloadFailure).
         """
-        # Convert iterable to list for multiple iterations
-        request_list = list(requests)
+        # Convert various input formats to DownloadRequest objects
+        request_list = self._parser.parse(list(requests))
 
-        # Create semaphore to limit concurrent downloads
-        semaphore = asyncio.Semaphore(self.max_concurrent)
+        # Create timeout configuration for the session
+        timeout_cfg = aiohttp.ClientTimeout(total=self.timeout)
 
-        # Create timeout configuration
-        timeout = aiohttp.ClientTimeout(total=self.timeout)
-
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            tasks = [
-                self._download_single(session, semaphore, req) for req in request_list
-            ]
+        async with aiohttp.ClientSession(timeout=timeout_cfg) as session:
+            tasks = [self._run_task(session, req) for req in request_list]
             results = await asyncio.gather(*tasks, return_exceptions=False)
 
         return results
 
-    async def download_dry(
-        self, requests: Iterable[DownloadRequest]
-    ) -> list[PreviewResult]:
+    async def _run_task(
+        self, session: aiohttp.ClientSession, request: DownloadRequest
+    ) -> DownloadResultType:
         """
-        Preview download requests without performing actual downloads.
-
-        Validates all download requests and returns preview results.
-        Useful for checking if URLs and filenames are valid before
-        starting actual downloads.
+        Run a single download task with semaphore protection.
+        세마포어 보호 하에 단일 다운로드 작업을 실행합니다.
 
         Parameters
         ----------
-        requests : Iterable[DownloadRequest]
-            Download requests to preview
+        session : aiohttp.ClientSession
+            The aiohttp session to use.
+            사용할 aiohttp 세션입니다.
+        request : DownloadRequest
+            The request to process.
+            처리할 요청입니다.
 
         Returns
         -------
-        list[PreviewResult]
-            List of preview results with validation status for each request
+        DownloadResultType
+            The result of the download task.
+            다운로드 작업의 결과입니다.
+        """
+        async with self._semaphore:
+            return await self._download_file(session, request)
+
+    async def _download_file(
+        self, session: aiohttp.ClientSession, request: DownloadRequest
+    ) -> DownloadResultType:
+        """
+        Execute the actual file download logic.
+        실제 파일 다운로드 로직을 실행합니다.
+        """
+        url_str = str(request.url)
+
+        # filename should be guaranteed by normalization, but check for type safety
+        if not request.filename:
+            return DownloadFailure(
+                url=url_str,
+                filename="unknown",
+                error="Filename missing in request",
+            )
+
+        file_path = self.out_dir / request.filename
+
+        try:
+            # Use streaming to save memory
+            # 메모리 절약을 위해 스트리밍 방식 사용
+            timeout_cfg = aiohttp.ClientTimeout(total=self.timeout)
+            async with session.get(url_str, timeout=timeout_cfg) as response:
+                if response.status == 200:
+                    async with aiofiles.open(file_path, "wb") as f:
+                        async for chunk in response.content.iter_chunked(8192):
+                            await f.write(chunk)
+
+                    return DownloadSuccess(
+                        url=url_str,
+                        filename=request.filename,
+                        file_path=str(file_path),
+                    )
+                else:
+                    error = HTTPError(url_str, response.status)
+                    return DownloadFailure(
+                        url=url_str,
+                        filename=request.filename,
+                        error=str(error),
+                    )
+
+        except asyncio.TimeoutError:
+            error = DownloadTimeoutError(url_str, self.timeout)
+            return DownloadFailure(
+                url=url_str,
+                filename=request.filename,
+                error=str(error),
+            )
+        except aiohttp.ClientError as e:
+            error = NetworkError(url_str, e)
+            return DownloadFailure(
+                url=url_str,
+                filename=request.filename,
+                error=str(error),
+            )
+        except (IOError, OSError) as e:
+            error = FileWriteError(request.filename, e)
+            return DownloadFailure(
+                url=url_str,
+                filename=request.filename,
+                error=str(error),
+            )
+        except Exception as e:
+            return DownloadFailure(
+                url=url_str,
+                filename=request.filename,
+                error=f"Unexpected error: {str(e)}",
+            )
+
+    async def validate_requests(
+        self,
+        requests: Iterable[DownloadInput],
+    ) -> list[DownloadRequest]:
+        """
+        Validate download requests without performing actual downloads.
+        실제 다운로드를 수행하지 않고 다운로드 요청을 검증합니다.
+
+        Validates all download requests and returns a list of DownloadRequest.
+        모든 다운로드 요청을 검증하고 DownloadRequest 리스트를 반환합니다.
+
+        Parameters
+        ----------
+        requests : Iterable[DownloadInput]
+            Download requests to validate (URL string, dict, or DownloadRequest object).
+            검증할 다운로드 요청입니다 (URL 문자열, dict, 또는 DownloadRequest 객체).
+
+        Returns
+        -------
+        list[DownloadRequest]
+            List of request objects.
+            요청 객체 리스트입니다.
+
+        Raises
+        ------
+        BulkValidationError
+            If one or more requests fail validation.
+            하나 이상의 요청이 검증에 실패한 경우 발생합니다.
 
         Examples
         --------
         >>> downloader = Downloader(out_dir=Path("./downloads"))
         >>> requests = [
-        ...     DownloadRequest(url="https://example.com/file.pdf", filename="file.pdf"),
-        ...     DownloadRequest(url="https://example.com/data.csv", filename="data.csv"),
+        ...     "https://example.com/file.pdf",
+        ...     {"url": "https://example.com/data.csv", "filename": "data.csv"},
         ... ]
-        >>> previews = await downloader.download_dry(requests)
-        >>> for preview in previews:
-        ...     if preview.status == "valid":
-        ...         print(f"✓ {preview.filename}")
-        ...     else:
-        ...         print(f"✗ {preview.filename}: {preview.reason}")
+        >>> try:
+        ...     valid_reqs = await downloader.validate_requests(requests)
+        ...     print(f"All {len(valid_reqs)} requests are valid")
+        ... except BulkValidationError as e:
+        ...     for err in e.errors:
+        ...         print(f"Invalid: {err.input_data}, Reason: {err.reason}")
         """
-        request_list = list(requests)
-        results = []
-
-        for req in request_list:
-            try:
-                # DownloadRequest.__post_init__ already validates URL
-                # Additional filename validation
-                if "/" in req.filename or "\\" in req.filename:
-                    raise ValueError("Filename cannot contain path separators")
-
-                results.append(
-                    PreviewResult(
-                        url=req.url,
-                        filename=req.filename,
-                        status="valid",
-                    )
-                )
-            except Exception as e:
-                # Extract filename safely for error reporting
-                filename = getattr(req, "filename", "unknown")
-                results.append(
-                    PreviewResult(
-                        url=req.url,
-                        filename=filename,
-                        status="invalid",
-                        reason=str(e),
-                    )
-                )
-
-        return results
-
-    async def _download_single(
-        self,
-        session: aiohttp.ClientSession,
-        semaphore: asyncio.Semaphore,
-        request: DownloadRequest,
-    ) -> DownloadResultType:
-        """
-        Download a single file with concurrency control.
-
-        Parameters
-        ----------
-        session : aiohttp.ClientSession
-            Shared HTTP client session.
-        semaphore : asyncio.Semaphore
-            Semaphore for limiting concurrent downloads.
-        request : DownloadRequest
-            Download request object.
-
-        Returns
-        -------
-        DownloadResultType
-            Either DownloadSuccess or DownloadFailure object.
-        """
-        async with semaphore:
-            try:
-                async with session.get(request.url) as response:
-                    if response.status == 200:
-                        file_path = self.out_dir / request.filename
-                        async with aiofiles.open(file_path, "wb") as f:
-                            content = await response.read()
-                            await f.write(content)
-
-                        return DownloadSuccess(
-                            url=request.url,
-                            filename=request.filename,
-                            file_path=str(file_path),
-                        )
-                    else:
-                        error = HTTPError(request.url, response.status)
-                        return DownloadFailure(
-                            url=request.url,
-                            filename=request.filename,
-                            error=str(error),
-                        )
-            except asyncio.TimeoutError:
-                error = DownloadTimeoutError(request.url, self.timeout)
-                return DownloadFailure(
-                    url=request.url,
-                    filename=request.filename,
-                    error=str(error),
-                )
-            except aiohttp.ClientError as e:
-                error = NetworkError(request.url, e)
-                return DownloadFailure(
-                    url=request.url,
-                    filename=request.filename,
-                    error=str(error),
-                )
-            except IOError as e:
-                error = FileWriteError(request.filename, e)
-                return DownloadFailure(
-                    url=request.url,
-                    filename=request.filename,
-                    error=str(error),
-                )
-            except Exception as e:
-                return DownloadFailure(
-                    url=request.url,
-                    filename=request.filename,
-                    error=f"Unexpected error: {str(e)}",
-                )
+        return self._parser.parse(list(requests))
