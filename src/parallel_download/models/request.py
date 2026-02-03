@@ -153,11 +153,13 @@ Examples
 def normalize_request(data: DownloadInput) -> DownloadRequest:
     """
     Convert a DownloadInput (str, dict, or DownloadRequest) into a validated DownloadRequest object.
-    DownloadInput(문자열, 딕셔너리, 또는 DownloadRequest)을 검증된 DownloadRequest 객체로 변환합니다.
+    DownloadInput(문자열, 딕셔너리, 또는 DownloadRequest)을 검증된
+    DownloadRequest 객체로 변환합니다.
 
     This function leverages the `DownloadRequest` model's `before` validator to handle
     parsing and filename extraction automatically.
-    이 함수는 `DownloadRequest` 모델의 `before` 검증기를 사용하여 파싱 및 파일명 추출을 자동으로 처리합니다.
+    이 함수는 `DownloadRequest` 모델의 `before` 검증기를 사용하여 파싱 및 파일명 추출을
+    자동으로 처리합니다.
 
     Parameters
     ----------

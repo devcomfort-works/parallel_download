@@ -1,15 +1,16 @@
 """Tests for Downloader class."""
 
-import pytest
 from pathlib import Path
 
+import pytest
+
 from parallel_download.downloader import Downloader
+from parallel_download.errors import BulkValidationError
 from parallel_download.models import (
+    DownloadFailure,
     DownloadRequest,
     DownloadSuccess,
-    DownloadFailure,
 )
-from parallel_download.errors import BulkValidationError
 
 
 class TestDownloaderInitializationValidation:
@@ -90,9 +91,7 @@ class TestDownloaderBasic:
             assert out_dir.exists()
 
     @pytest.mark.asyncio
-    async def test_download_small_file(
-        self, temp_download_dir: Path, httpbin_urls: dict
-    ):
+    async def test_download_small_file(self, temp_download_dir: Path, httpbin_urls: dict):
         """Test downloading a small file."""
         downloader = Downloader(out_dir=temp_download_dir, timeout=10)
         request = DownloadRequest(url=httpbin_urls["small_file"], filename="small.bin")
@@ -105,9 +104,7 @@ class TestDownloaderBasic:
         assert (temp_download_dir / "small.bin").exists()
 
     @pytest.mark.asyncio
-    async def test_download_text_file(
-        self, temp_download_dir: Path, httpbin_urls: dict
-    ):
+    async def test_download_text_file(self, temp_download_dir: Path, httpbin_urls: dict):
         """Test downloading a text file."""
         downloader = Downloader(out_dir=temp_download_dir, timeout=10)
         request = DownloadRequest(url=httpbin_urls["text_file"], filename="robots.txt")
@@ -119,14 +116,10 @@ class TestDownloaderBasic:
         assert (temp_download_dir / "robots.txt").exists()
 
     @pytest.mark.asyncio
-    async def test_download_http_error(
-        self, temp_download_dir: Path, httpbin_urls: dict
-    ):
+    async def test_download_http_error(self, temp_download_dir: Path, httpbin_urls: dict):
         """Test downloading with HTTP error response."""
         downloader = Downloader(out_dir=temp_download_dir, timeout=10)
-        request = DownloadRequest(
-            url=httpbin_urls["status_404"], filename="notfound.txt"
-        )
+        request = DownloadRequest(url=httpbin_urls["status_404"], filename="notfound.txt")
 
         results = await downloader.download([request])
 
@@ -140,9 +133,7 @@ class TestDownloaderParallel:
     """Tests for parallel download functionality."""
 
     @pytest.mark.asyncio
-    async def test_download_multiple_files(
-        self, temp_download_dir: Path, httpbin_urls: dict
-    ):
+    async def test_download_multiple_files(self, temp_download_dir: Path, httpbin_urls: dict):
         """Test downloading multiple files in parallel."""
         downloader = Downloader(out_dir=temp_download_dir, timeout=10, max_concurrent=3)
         requests = [
@@ -222,7 +213,8 @@ class TestDownloaderFullFactorial:
 
         assert len(results) == 1
         assert isinstance(results[0], DownloadSuccess), (
-            f"Failed with params: {file_size_param}, {explicit_filename_param}, {max_concurrent_param}"
+            f"Failed with params: {file_size_param}, {explicit_filename_param}, "
+            f"{max_concurrent_param}"
         )
         assert (temp_download_dir / filename).exists()
 
@@ -273,10 +265,7 @@ class TestDownloaderFullFactorial:
         assert all(isinstance(r, DownloadSuccess) for r in results), (
             f"Some downloads failed with max_concurrent={max_concurrent_param}"
         )
-        assert (
-            len([r for r in results if (temp_download_dir / r.filename).exists()])
-            == num_files
-        )
+        assert len([r for r in results if (temp_download_dir / r.filename).exists()]) == num_files
 
     @pytest.mark.asyncio
     async def test_factorial_timeout_and_concurrency(
@@ -304,9 +293,7 @@ class TestDownloaderFullFactorial:
             max_concurrent=max_concurrent_param,
         )
 
-        requests = [
-            DownloadRequest(url=url, filename=f"timeout_test_{i}.txt") for i in range(3)
-        ]
+        requests = [DownloadRequest(url=url, filename=f"timeout_test_{i}.txt") for i in range(3)]
 
         results = await downloader.download(requests)
 
@@ -323,8 +310,8 @@ class TestDownloaderEdgeCases:
     @pytest.mark.asyncio
     async def test_download_to_readonly_directory(self, httpbin_urls: dict):
         """Test download behavior with read-only directory."""
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
             out_dir = Path(tmpdir) / "readonly"
@@ -354,9 +341,7 @@ class TestDownloaderEdgeCases:
         assert len(results) == 0
 
     @pytest.mark.asyncio
-    async def test_download_result_structure(
-        self, temp_download_dir: Path, httpbin_urls: dict
-    ):
+    async def test_download_result_structure(self, temp_download_dir: Path, httpbin_urls: dict):
         """Test that download results have correct structure."""
         downloader = Downloader(out_dir=temp_download_dir, timeout=10)
         request = DownloadRequest(

@@ -4,14 +4,13 @@ DownloadRequest 모델 및 파일명 추출에 대한 테스트입니다.
 """
 
 import pytest
-from pydantic import ValidationError
 
+from parallel_download.errors import (
+    DirectoryPathError,
+    NoPathInURLError,
+)
 from parallel_download.models import DownloadRequest
 from parallel_download.url_processor import extract_filename_from_url
-from parallel_download.errors import (
-    NoPathInURLError,
-    DirectoryPathError,
-)
 
 
 class TestDownloadRequestNormalization:

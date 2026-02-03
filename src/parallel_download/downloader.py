@@ -89,9 +89,7 @@ class Downloader:
 
         # Validate max_concurrent
         if not isinstance(max_concurrent, int) or max_concurrent <= 0:
-            raise ValueError(
-                f"max_concurrent must be a positive integer, got {max_concurrent}"
-            )
+            raise ValueError(f"max_concurrent must be a positive integer, got {max_concurrent}")
         self.max_concurrent = max_concurrent
 
         # Global semaphore for async-safe concurrency control
@@ -101,9 +99,7 @@ class Downloader:
         self._dir = Directory(self.out_dir)
         self._dir.ensure()
 
-    async def download(
-        self, requests: Iterable[DownloadInput]
-    ) -> list[DownloadResultType]:
+    async def download(self, requests: Iterable[DownloadInput]) -> list[DownloadResultType]:
         """
         Download files in parallel from the given requests.
         주어진 요청들에 대해 파일을 병렬로 다운로드합니다.

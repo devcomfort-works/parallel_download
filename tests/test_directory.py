@@ -1,7 +1,8 @@
 """Tests for Directory class."""
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
 from parallel_download.filesystem.directory import Directory
 
 

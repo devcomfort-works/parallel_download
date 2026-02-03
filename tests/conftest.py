@@ -1,10 +1,11 @@
 """Pytest configuration and fixtures for parallel_download tests."""
 
-import pytest
 import asyncio
 import tempfile
 from pathlib import Path
 from typing import Generator
+
+import pytest
 
 
 @pytest.fixture(scope="session")
@@ -112,4 +113,3 @@ def max_concurrent_param(request) -> int:
         Maximum concurrent downloads.
     """
     return request.param
-
