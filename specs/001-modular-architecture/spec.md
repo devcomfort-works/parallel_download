@@ -1,4 +1,4 @@
-# Feature Specification: Refactor: Modularize Codebase Structure
+# Feature Specification: Modular Architecture
 
 **Feature Branch**: `001-refactor-structure`  
 **Created**: 2026-02-02  

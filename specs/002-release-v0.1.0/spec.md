@@ -1,4 +1,4 @@
-# Feature Specification: Finalize Release Preparation
+# Feature Specification: Release v0.1.0 Definition
 
 **Feature Branch**: `002-finalize-release-prep`  
 **Created**: 2026-02-02  
