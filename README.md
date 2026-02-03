@@ -3,18 +3,19 @@
 A high-performance, type-safe parallel file downloader using asyncio and aiohttp.
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-77%20passed-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)]()
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)]()
+[![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
 ## ✨ Features
 
 - 🚀 **Concurrent Downloads**: Download multiple files in parallel with configurable concurrency limits using asyncio
-- 🎯 **Recipe-Based Configuration**: Predefined timeout recipes (`FOR_LARGE_FILES`, `BALANCED`, `FOR_SMALL_FILES`) optimized for different scenarios
 - 📁 **Automatic Filename Extraction**: Auto-extract filenames from URLs with URL-decoding support. Raises explicit errors on invalid URLs (no path, directory paths, empty filenames) to prevent silent failures. This design ensures data traceability and forces developers to make explicit decisions, avoiding hidden bugs in automated workflows.
-- 🛡️ **Type-Safe**: Full type hints with Literal types for better IDE support and compile-time checks
+- 🛡️ **Type-Safe**: Full type hints and static analysis (mypy strict) for robust code
 - 📊 **Structured Results**: Detailed result objects (`DownloadSuccess`, `DownloadFailure`) for precise error handling
 - ⚡ **Semaphore-Based Control**: Prevent resource exhaustion with configurable concurrent download limits
-- ✅ **Comprehensive Testing**: 77 tests covering all edge cases and error scenarios
+- ✅ **Comprehensive Testing**: 72 tests covering all edge cases and error scenarios
 - 🔍 **Detailed Error Handling**: Custom exception classes with meaningful error messages
 
 ## 📦 Installation
@@ -42,10 +43,10 @@ from parallel_download.downloader import Downloader
 from parallel_download.models import DownloadRequest
 
 async def main():
-    # Create downloader with BALANCED timeout (60 seconds)
+    # Create downloader (timeout: 60s, concurrency: 5)
     downloader = Downloader(
         out_dir=Path("./downloads"),
-        timeout="BALANCED",
+        timeout=60,
         max_concurrent=5
     )
 
@@ -76,153 +77,52 @@ asyncio.run(main())
 
 ### Automatic Filename Extraction
 
-The library extracts filenames from URLs automatically, but raises explicit errors for invalid cases. This design ensures data integrity and traceability.
-
-#### ✅ Valid Cases (Automatically Extracted)
+The library auto-extracts filenames, but strictly rejects ambiguous or unsafe URLs.
 
 ```python
 from parallel_download.models import DownloadRequest
 
-# Simple filename extraction
-request = DownloadRequest(url="https://example.com/documents/report.pdf")
-print(request.filename)  # Output: report.pdf
+# ✅ Valid Cases
+DownloadRequest(url="https://example.com/report.pdf")               # filename="report.pdf"
+DownloadRequest(url="https://example.com/files/my%20doc.pdf")       # filename="my doc.pdf"
+DownloadRequest(url="https://example.com/data/", filename="d.zip")  # filename="d.zip" (explicit override works)
 
-# URL-encoded filenames are decoded
-request = DownloadRequest(url="https://example.com/files/my%20document.pdf")
-print(request.filename)  # Output: my document.pdf
-
-# Multiple dots in filename
-request = DownloadRequest(url="https://example.com/archive.backup.2024.tar.gz")
-print(request.filename)  # Output: archive.backup.2024.tar.gz
-```
-
-#### ❌ Invalid Cases (Explicit Errors Required)
-
-The following cases raise errors to force explicit handling:
-
-```python
-from parallel_download.models import DownloadRequest
-from parallel_download.errors import NoPathInURLError, DirectoryPathError
-
-# No path in URL - raises NoPathInURLError
-# Prevents silent failures in bulk operations
-try:
-    request = DownloadRequest(url="https://example.com")
-except NoPathInURLError as e:
-    print(f"Must provide explicit filename: {e}")
-
-# Directory path (ends with /) - raises DirectoryPathError
-# Ensures you don't accidentally treat directories as files
-try:
-    request = DownloadRequest(url="https://example.com/data/")
-except DirectoryPathError as e:
-    print(f"Use explicit filename for directory URLs: {e}")
-
-# Workaround: Provide explicit filename
-request = DownloadRequest(url="https://example.com/data/", filename="data.zip")
-print(request.filename)  # Output: data.zip
+# ❌ Invalid Cases (Raises Error)
+DownloadRequest(url="https://example.com")         # Error: NoPathInURLError (No filename in path)
+DownloadRequest(url="https://example.com/data/")   # Error: DirectoryPathError (Path ends with /)
 ```
 
 #### Design Philosophy
 
-**Why explicit errors instead of silent defaults?**
-
-1. **Data Traceability**: Researchers and developers need to know exactly where files came from
-2. **Prevents Hidden Bugs**: Auto-generating filenames like `download_123.bin` masks the original source
-3. **Explicit Intention**: Forces developers to consider each edge case in batch operations
-4. **Safer Workflows**: Errors fail fast in automated systems instead of creating cryptic output filenames
+We force errors instead of guessing (e.g., `download.bin`) to ensure data traceability and prevent hidden bugs in automated workflows.
 
 ## 📖 Usage Guide
 
-### Timeout Recipes
+### Timeout Configuration
 
-Choose the appropriate recipe based on your file sizes:
-
-#### FOR_LARGE_FILES (300 seconds / 5 minutes)
-
-Use for downloading large files (several GB to tens of GB):
+You can configure the timeout in seconds (integer).
 
 ```python
-downloader = Downloader(
-    out_dir=Path("./large_files"),
-    timeout="FOR_LARGE_FILES",  # 300s
-    max_concurrent=3
-)
+# Default is 60 seconds
+downloader = Downloader(out_dir=Path("."), timeout=60)
+
+# Custom timeout
+downloader = Downloader(out_dir=Path("."), timeout=120)
 ```
 
-#### BALANCED (60 seconds / 1 minute)
+### Error Handling Pattern
 
-Default recipe for mixed file sizes:
-
-```python
-downloader = Downloader(
-    out_dir=Path("./downloads"),
-    timeout="BALANCED",  # 60s (default)
-    max_concurrent=5     # (default)
-)
-```
-
-#### FOR_SMALL_FILES (15 seconds)
-
-Use for downloading small files (KB-MB range):
+Results are explicit objects (`DownloadSuccess` or `DownloadFailure`).
 
 ```python
-downloader = Downloader(
-    out_dir=Path("./small_files"),
-    timeout="FOR_SMALL_FILES",  # 15s
-    max_concurrent=10
-)
-```
+results = await downloader.download(requests)
 
-### Custom Timeout Values
-
-Specify timeout in seconds directly:
-
-```python
-downloader = Downloader(
-    out_dir=Path("./downloads"),
-    timeout=120,         # 2 minutes
-    max_concurrent=7
-)
-```
-
-### Error Handling
-
-Handle different error scenarios with custom exceptions:
-
-```python
-from parallel_download.downloader import Downloader
-from parallel_download.models import (
-    DownloadRequest,
-    DownloadSuccess,
-    DownloadFailure,
-)
-from parallel_download.errors import (
-    HTTPError,
-    DownloadTimeoutError,
-    NetworkError,
-)
-
-async def download_with_error_handling():
-    downloader = Downloader(out_dir=Path("./downloads"))
-
-    requests = [
-        DownloadRequest(url="https://example.com/file.pdf", filename="file.pdf"),
-    ]
-
-    results = await downloader.download(requests)
-
-    for result in results:
-        if isinstance(result, DownloadSuccess):
-            print(f"Downloaded: {result.file_path}")
-        elif isinstance(result, DownloadFailure):
-            error_msg = result.error
-            if "HTTP 404" in error_msg:
-                print(f"File not found: {result.url}")
-            elif "timeout" in error_msg.lower():
-                print(f"Download timed out: {result.url}")
-            else:
-                print(f"Download failed: {error_msg}")
+for res in results:
+    if res.status == "success":
+        print(f"✅ Saved: {res.file_path}")
+    else:
+        # res is DownloadFailure
+        print(f"❌ Failed: {res.error} (URL: {res.url})")
 ```
 
 ## 🔌 API Reference
@@ -236,7 +136,7 @@ class Downloader:
     def __init__(
         self,
         out_dir: Path,
-        timeout: Literal["FOR_LARGE_FILES", "BALANCED", "FOR_SMALL_FILES"] | int = "BALANCED",
+        timeout: int = 60,
         max_concurrent: int = 5,
     ) -> None:
         """
@@ -244,7 +144,7 @@ class Downloader:
 
         Args:
             out_dir: Output directory for downloaded files
-            timeout: Timeout recipe or seconds (must be positive)
+            timeout: Timeout in seconds (default: 60)
             max_concurrent: Maximum concurrent downloads (must be positive)
 
         Raises:
@@ -346,7 +246,7 @@ from parallel_download.models import DownloadRequest, DownloadSuccess, DownloadF
 async def download_with_progress():
     downloader = Downloader(
         out_dir=Path("./downloads"),
-        timeout="BALANCED",
+        timeout=60,
         max_concurrent=5
     )
 
@@ -376,20 +276,20 @@ async def download_with_progress():
 asyncio.run(download_with_progress())
 ```
 
-### Batch Processing with Recipe Selection
+### Batch Processing with Custom Timeouts
 
 ```python
 async def batch_download(file_size_category: str):
-    # Select recipe based on file size
-    recipe_map = {
-        "small": "FOR_SMALL_FILES",
-        "medium": "BALANCED",
-        "large": "FOR_LARGE_FILES",
+    # Select timeout based on file size
+    timeout_map = {
+        "small": 15,
+        "medium": 60,
+        "large": 300,
     }
 
     downloader = Downloader(
         out_dir=Path(f"./downloads/{file_size_category}"),
-        timeout=recipe_map[file_size_category],
+        timeout=timeout_map[file_size_category],
     )
 
     requests = [
@@ -457,14 +357,11 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (includes coverage report by default)
 rye run pytest
 
 # Run specific test file
 rye run pytest tests/test_downloader.py
-
-# Run with coverage
-rye run pytest --cov=src/parallel_download
 
 # Run specific test class
 rye run pytest tests/test_downloader.py::TestDownloaderInitializationValidation
@@ -475,11 +372,11 @@ rye run pytest -vv
 
 ### Test Coverage
 
-The project includes 77 comprehensive tests:
+The project includes 72 comprehensive tests:
 
-- **23 tests** for `DownloadRequest` (filename extraction, URL parsing, error handling)
-- **9 tests** for `Downloader` initialization validation (recipe validation, parameter checks)
-- **45 tests** for `Downloader` functionality (basic downloads, parallel downloads, full-factorial tests, edge cases)
+- **DownloadRequest**: Filename extraction, URL parsing, and error handling
+- **Downloader Configuration**: Initialization validation (timeouts, parameter checks)
+- **Downloader Functionality**: Basic downloads, parallel execution, edge cases, and full-factorial scenarios
 
 ### Code Quality
 
@@ -500,23 +397,22 @@ rye run mypy src
 parallel-download/
 ├── src/parallel_download/
 │   ├── __init__.py           # Package exports
-│   ├── config.py             # Timeout recipe definitions
 │   ├── downloader.py         # Main Downloader class
-│   ├── download_request.py   # DownloadRequest dataclass
-│   ├── download_result.py    # Result dataclasses
-│   ├── errors.py             # Custom exceptions
-│   └── utils.py              # Utility functions
+│   ├── errors/               # Custom exceptions
+│   ├── filesystem/           # File system operations
+│   ├── models/               # Data models (Request/Result)
+│   └── url_processor/        # URL handling Iogic
 ├── tests/
-│   ├── conftest.py          # Pytest fixtures
-│   ├── test_downloader.py   # Downloader tests
-│   ├── test_download_request.py # DownloadRequest tests
-│   └── test_utils.py        # Utils tests
-├── examples/                # Example scripts
+│   ├── conftest.py           # Pytest fixtures
+│   ├── test_downloader.py    # Downloader tests
+│   ├── test_directory.py     # Directory tests
+│   └── test_download_request.py # Request tests
+├── examples/                 # Example scripts
 │   ├── __init__.py
-│   └── download_dry_preview.py  # dry_run preview with tabulate
-├── pyproject.toml           # Project configuration
-├── README.md               # This file
-└── TESTING.md              # Testing guide
+│   └── demo_download.py      # Demo script
+├── pyproject.toml            # Project configuration
+├── README.md                 # This file
+└── TESTING.md                # Testing guide
 ```
 
 ### Contributing
