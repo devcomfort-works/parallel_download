@@ -1,7 +1,10 @@
 """Tests for Downloader class."""
 
+import asyncio
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
+import aiohttp
 import pytest
 
 from parallel_download.downloader import Downloader
@@ -440,3 +443,56 @@ class TestDownloaderValidation:
             await downloader.validate_requests(requests)
 
         assert len(excinfo.value.exceptions) == 2
+
+
+class TestDownloaderExceptionHandlers:
+    """Tests for _download_file exception handling branches in downloader.py."""
+
+    @pytest.mark.asyncio
+    async def test_timeout_error_returns_failure(self, tmp_path: Path):
+        """Test that asyncio.TimeoutError is caught and returned as DownloadFailure."""
+        downloader = Downloader(out_dir=tmp_path, timeout=1)
+        request = DownloadRequest(url="https://example.com/file.txt", filename="file.txt")
+
+        mock_session = AsyncMock(spec=aiohttp.ClientSession)
+        # session.get() returns a context manager; raise on __aenter__
+        mock_ctx = AsyncMock()
+        mock_ctx.__aenter__.side_effect = asyncio.TimeoutError()
+        mock_session.get.return_value = mock_ctx
+
+        result = await downloader._download_file(mock_session, request)
+
+        assert isinstance(result, DownloadFailure)
+        assert "timed out" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_client_error_returns_failure(self, tmp_path: Path):
+        """Test that aiohttp.ClientError is caught and returned as DownloadFailure."""
+        downloader = Downloader(out_dir=tmp_path, timeout=10)
+        request = DownloadRequest(url="https://example.com/file.txt", filename="file.txt")
+
+        mock_session = AsyncMock(spec=aiohttp.ClientSession)
+        mock_ctx = AsyncMock()
+        mock_ctx.__aenter__.side_effect = aiohttp.ClientConnectionError("Connection refused")
+        mock_session.get.return_value = mock_ctx
+
+        result = await downloader._download_file(mock_session, request)
+
+        assert isinstance(result, DownloadFailure)
+        assert "network error" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_unexpected_error_returns_failure(self, tmp_path: Path):
+        """Test that unexpected Exception is caught and returned as DownloadFailure."""
+        downloader = Downloader(out_dir=tmp_path, timeout=10)
+        request = DownloadRequest(url="https://example.com/file.txt", filename="file.txt")
+
+        mock_session = AsyncMock(spec=aiohttp.ClientSession)
+        mock_ctx = AsyncMock()
+        mock_ctx.__aenter__.side_effect = RuntimeError("Something completely unexpected")
+        mock_session.get.return_value = mock_ctx
+
+        result = await downloader._download_file(mock_session, request)
+
+        assert isinstance(result, DownloadFailure)
+        assert "unexpected error" in result.error.lower()

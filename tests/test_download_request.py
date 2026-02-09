@@ -3,14 +3,125 @@ Tests for DownloadRequest model and filename extraction.
 DownloadRequest 모델 및 파일명 추출에 대한 테스트입니다.
 """
 
+import asyncio
 import pytest
+from unittest.mock import patch
+from exceptiongroup import ExceptionGroup
 
 from parallel_download.errors import (
+    BulkValidationError,
     DirectoryPathError,
     NoPathInURLError,
+    HTTPError,
+    DownloadTimeoutError,
+    NetworkError,
+    FileWriteError,
 )
 from parallel_download.models import DownloadRequest
+from parallel_download.models.request import normalize_request
 from parallel_download.url_processor import extract_filename_from_url
+
+
+class TestBulkValidationError:
+    """Test BulkValidationError coverage for validation_errors.py"""
+
+    def test_bulk_validation_error_creation(self):
+        """Test BulkValidationError can be instantiated and raised."""
+        errors = [ValueError("Invalid URL"), ValueError("Missing filename")]
+        with pytest.raises(BulkValidationError) as exc_info:
+            raise BulkValidationError("Batch validation failed", errors)
+
+        assert len(exc_info.value.exceptions) == 2
+        assert "Batch validation failed" in str(exc_info.value)
+
+
+class TestDownloadErrors:
+    """Test coverage for download_errors.py"""
+
+    def test_http_error_creation(self):
+        """Test HTTPError can be instantiated."""
+        error = HTTPError("https://example.com", 404)
+        assert error.url == "https://example.com"
+        assert error.status_code == 404
+        assert "404" in str(error)
+
+    def test_download_timeout_error_creation(self):
+        """Test DownloadTimeoutError can be instantiated."""
+        error = DownloadTimeoutError("https://example.com", 30)
+        assert error.url == "https://example.com"
+        assert error.timeout == 30
+        assert "30" in str(error)
+
+    def test_network_error_creation(self):
+        """Test NetworkError can be instantiated."""
+        original_error = ConnectionError("Connection failed")
+        error = NetworkError("https://example.com", original_error)
+        assert error.url == "https://example.com"
+        assert error.original_error == original_error
+        assert "Connection failed" in str(error)
+
+    def test_file_write_error_creation(self):
+        """Test FileWriteError can be instantiated."""
+        original_error = PermissionError("Permission denied")
+        error = FileWriteError("test.txt", original_error)
+        assert error.filename == "test.txt"
+        assert error.original_error == original_error
+        assert "Permission denied" in str(error)
+
+
+class TestExtractFilenameFromUrlCoverage:
+    """Test coverage for extract_filename_from_url.py"""
+
+    def test_extract_filename_with_url_encoded_characters(self):
+        """Test extract_filename_from_url with URL-encoded characters"""
+        from parallel_download.url_processor.extract_filename_from_url import (
+            extract_filename_from_url,
+        )
+
+        # Test with URL-encoded filename
+        url = "https://example.com/path/to/my%20file%20with%20spaces.pdf"
+        filename = extract_filename_from_url(url)
+        assert filename == "my file with spaces.pdf"
+
+    def test_extract_filename_with_special_characters(self):
+        """Test extract_filename_from_url with special characters"""
+        from parallel_download.url_processor.extract_filename_from_url import (
+            extract_filename_from_url,
+        )
+
+        # Test with special characters that are valid in URLs
+        url = "https://example.com/path/to/file-with_special.chars%2Bmore.pdf"
+        filename = extract_filename_from_url(url)
+        assert filename == "file-with_special.chars+more.pdf"
+
+
+class TestDownloadRequestModelValidator:
+    """Test coverage for DownloadRequest model validator"""
+
+    def test_normalize_request_with_dict_missing_url(self):
+        """Test normalize_request with dict missing url raises ValueError"""
+        with pytest.raises(ValueError, match="Dictionary input must contain 'url' key"):
+            DownloadRequest.model_validate({})
+
+    def test_normalize_request_with_invalid_type(self):
+        """Test normalize_request with invalid type raises TypeError"""
+        with pytest.raises(TypeError, match="Unsupported input type"):
+            DownloadRequest.model_validate(123)
+
+    def test_normalize_request_function_with_request_object(self):
+        """Test normalize_request function with DownloadRequest object"""
+        original_req = DownloadRequest(url="https://example.com/file.txt")
+        result = normalize_request(original_req)
+        assert result is original_req  # Should return same object
+
+
+class TestDownloadRequestModelValidatorRemaining:
+    """Test remaining coverage for DownloadRequest model validator"""
+
+    def test_normalize_request_with_invalid_input_type(self):
+        """Test normalize_request with unsupported input type"""
+        with pytest.raises(TypeError, match="Unsupported input type"):
+            DownloadRequest.model_validate(123)  # Pass an integer instead of supported types
 
 
 class TestDownloadRequestNormalization:
@@ -170,3 +281,47 @@ class TestFilenameExtractionErrors:
         # We expect DirectoryPathError directly as it bubbles up from validation
         with pytest.raises(DirectoryPathError):
             DownloadRequest(url=url)  # type: ignore
+
+
+class TestNormalizeRequestFunction:
+    """Tests for normalize_request() function with non-DownloadRequest inputs."""
+
+    def test_normalize_request_with_string(self):
+        """Test normalize_request with a plain URL string."""
+        result = normalize_request("https://example.com/file.zip")
+        assert isinstance(result, DownloadRequest)
+        assert result.filename == "file.zip"
+
+    def test_normalize_request_with_dict(self):
+        """Test normalize_request with a dict input."""
+        result = normalize_request({"url": "https://example.com/data.csv"})
+        assert isinstance(result, DownloadRequest)
+        assert result.filename == "data.csv"
+
+    def test_normalize_request_with_dict_and_filename(self):
+        """Test normalize_request with a dict containing explicit filename."""
+        result = normalize_request({"url": "https://example.com/data", "filename": "custom.csv"})
+        assert isinstance(result, DownloadRequest)
+        assert result.filename == "custom.csv"
+
+
+class TestRequestParserSingleInput:
+    """Tests for RequestParser.parse() with single (non-list) input."""
+
+    def test_parse_single_string_input(self):
+        """Test parse() accepts a single string instead of a list."""
+        from parallel_download.url_processor import RequestParser
+
+        parser = RequestParser()
+        result = parser.parse("https://example.com/file.pdf")
+        assert len(result) == 1
+        assert result[0].filename == "file.pdf"
+
+    def test_parse_single_dict_input(self):
+        """Test parse() accepts a single dict instead of a list."""
+        from parallel_download.url_processor import RequestParser
+
+        parser = RequestParser()
+        result = parser.parse({"url": "https://example.com/report.pdf"})
+        assert len(result) == 1
+        assert result[0].filename == "report.pdf"
