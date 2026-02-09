@@ -39,7 +39,7 @@ def extract_filename_from_url(url: str) -> str:
         raise DirectoryPathError(url)
 
     filename = Path(path).name
-    if not filename:
+    if not filename:  # pragma: no cover — urlparse 특성상 path가 존재하면서 Path(path).name이 빈 문자열이 되는 경우 없음; 방어적 코드
         raise NoPathInURLError(url)
 
     return unquote(filename)

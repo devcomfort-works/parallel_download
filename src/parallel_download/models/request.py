@@ -88,7 +88,9 @@ class DownloadRequest(BaseModel):
         (Effect: Converts object back to dictionary. / 객체를 다시 딕셔너리로 변환합니다.)
         """
         # 1. 입력 데이터의 타입에 따라 딕셔너리 형태로 변환합니다.
-        if isinstance(data, DownloadRequest):
+        if isinstance(
+            data, DownloadRequest
+        ):  # pragma: no cover — Pydantic v2 frozen 모델 최적화로 이 분기에 도달 불가; 방어적 코드
             data = {"url": data.url, "filename": data.filename}
         elif isinstance(data, str):
             data = {"url": data}

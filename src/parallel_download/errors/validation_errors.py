@@ -2,7 +2,9 @@
 
 try:
     ExceptionGroup
-except NameError:
+except (
+    NameError
+):  # pragma: no cover — Python 3.11 미만에서만 실행; 단일 환경 CI에서는 구조적으로 커버 불가
     from exceptiongroup import ExceptionGroup
 
 
