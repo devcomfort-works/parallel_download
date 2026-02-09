@@ -1,10 +1,10 @@
 ---
-description: "Task list for Refactor: Modularize Codebase Structure"
+description: "Task list for Project Structure"
 ---
 
-# Tasks: Refactor: Modularize Codebase Structure
+# Tasks: Project Structure
 
-**Input**: Design documents from `/specs/001-refactor-structure/`
+**Input**: Design documents from `/specs/001-project-structure/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories)
 
 **Tests**: Testing is MANDATORY per Constitution Principle IV. Every feature and user story must have associated tests covering happy paths and edge cases.

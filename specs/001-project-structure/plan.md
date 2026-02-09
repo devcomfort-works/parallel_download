@@ -1,7 +1,7 @@
-# Implementation Plan: Refactor: Modularize Codebase Structure
+# Implementation Plan: Project Structure
 
-**Branch**: `001-refactor-structure` | **Date**: 2026-02-02 | **Spec**: [Spec](spec.md)
-**Input**: Feature specification from `specs/001-refactor-structure/spec.md`
+**Branch**: `001-project-structure` | **Date**: 2026-02-02 | **Spec**: [Spec](spec.md)
+**Input**: Feature specification from `specs/001-project-structure/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
@@ -23,25 +23,30 @@ Refactor the monolithic `parallel_download` package into logical submodules (`mo
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 ### I. Type Safety First
+
 - **Compliance**: ✅
 - **Notes**: All moved and new files must retain or improve type hints. `mypy` check required.
 
 ### II. Asynchronous By Design
+
 - **Compliance**: ✅
 - **Notes**: No changes to async logic, structural move only.
 
 ### III. Explicit Error Handling
+
 - **Compliance**: ✅
 - **Notes**: Errors are being modularized into `errors/` package.
 
 ### IV. Comprehensive Testing
+
 - **Compliance**: ✅
 - **Notes**: Existing tests must pass. Import paths in tests will need updating.
 
 ### V. Code Style Consistency
+
 - **Compliance**: ✅
 - **Notes**: `black`, `isort`, `flake8` must pass on new structure.
 
@@ -50,7 +55,7 @@ Refactor the monolithic `parallel_download` package into logical submodules (`mo
 ### Documentation (this feature)
 
 ```text
-specs/001-refactor-structure/
+specs/001-project-structure/
 ├── plan.md              # This file
 ├── spec.md              # Feature Spec
 └── checklists/
@@ -87,6 +92,7 @@ tests/                             # UPDATED: Imports
 ```
 
 **Structure Decision**:
+
 - Adopted **Option 4** (Custom/Refactor): Decompose monolith.
 - Key move: `directory.py` -> `filesystem/directory.py`.
 - Key change: `__init__.py` becomes empty or minimal docstring only.
