@@ -1,7 +1,7 @@
-# Implementation Plan: Finalize Release Preparation
+# Implementation Plan: Library Distribution
 
-**Branch**: `002-finalize-release-prep` | **Date**: 2026-02-03 | **Spec**: [specs/002-finalize-release-prep/spec.md](specs/002-finalize-release-prep/spec.md)
-**Input**: Feature specification from `/specs/002-finalize-release-prep/spec.md`
+**Branch**: `002-library-distribution` | **Date**: 2026-02-03 | **Spec**: [Spec](spec.md)
+**Input**: Feature specification from `/specs/002-library-distribution/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
@@ -40,7 +40,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 ### Documentation (this feature)
 
 ```text
-specs/002-finalize-release-prep/
+specs/002-library-distribution/
 ├── plan.md              # This file
 ├── research.md          # Research findings
 └── tasks.md             # Implementation tasks

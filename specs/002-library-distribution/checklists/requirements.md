@@ -1,8 +1,8 @@
-# Specification Quality Checklist: Finalize Release Preparation
+# Specification Quality Checklist: Library Distribution
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-02-02
-**Feature**: [Link to spec.md](../../specs/002-finalize-release-prep/spec.md)
+**Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 

@@ -1,6 +1,6 @@
-# Feature Specification: Release v0.1.0 Definition
+# Feature Specification: Library Distribution
 
-**Feature Branch**: `002-finalize-release-prep`  
+**Feature Branch**: `002-library-distribution`  
 **Created**: 2026-02-02  
 **Status**: Draft  
 **Input**: User description: "Check test coverage, update README, and prepare package distribution"

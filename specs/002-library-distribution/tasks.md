@@ -1,8 +1,8 @@
-# Tasks: Finalize Release Preparation
+# Tasks: Library Distribution
 
-**Feature**: Finalize Release Preparation
+**Feature**: Library Distribution
 **Status**: In Progress
-**Spec**: [specs/002-finalize-release-prep/spec.md](specs/002-finalize-release-prep/spec.md)
+**Spec**: [Spec](spec.md)
 
 ## Phase 1: Setup & Configuration
 
