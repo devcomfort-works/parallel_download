@@ -1,522 +1,251 @@
 # parallel-download
 
-A high-performance, type-safe parallel file downloader using asyncio and aiohttp.
+asyncio + aiohttp 기반의 고성능 병렬 파일 다운로더입니다.
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)]()
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)]()
-[![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen.svg)]()
-[![License](https://img.shields.io/badge/license-MIT-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-91%20passed-brightgreen.svg)]()
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)]()
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## ✨ Features
+## Features
 
-- 🚀 **Concurrent Downloads**: Download multiple files in parallel with configurable concurrency limits using asyncio
-- 📁 **Automatic Filename Extraction**: Auto-extract filenames from URLs with URL-decoding support. Raises explicit errors on invalid URLs (no path, directory paths, empty filenames) to prevent silent failures. This design ensures data traceability and forces developers to make explicit decisions, avoiding hidden bugs in automated workflows.
-- 🛡️ **Type-Safe**: Full type hints and static analysis (mypy strict) for robust code
-- 📊 **Structured Results**: Detailed result objects (`DownloadSuccess`, `DownloadFailure`) for precise error handling
-- ⚡ **Semaphore-Based Control**: Prevent resource exhaustion with configurable concurrent download limits
-- ✅ **Comprehensive Testing**: 72 tests covering all edge cases and error scenarios
-- 🔍 **Detailed Error Handling**: Custom exception classes with meaningful error messages
+- **병렬 다운로드** — asyncio 세마포어 기반 동시성 제어로 리소스 고갈 없이 빠르게 다운로드
+- **자동 파일명 추출** — URL에서 파일명을 자동 추출하며, 모호한 URL은 명시적 에러로 거부
+- **타입 안전** — Pydantic v2 모델 + 전체 타입 힌트로 런타임 안전성 보장
+- **구조화된 결과** — `DownloadSuccess` / `DownloadFailure` 판별 유니온(Discriminated Union)으로 결과 처리
+- **계층적 에러** — 목적별 예외 클래스(`HTTPError`, `NetworkError`, `DownloadTimeoutError` 등)
+- **100% 테스트 커버리지** — 91개 테스트, 브랜치 커버리지 포함
 
-## 📦 Installation
+## 설치
 
-### Using rye (recommended)
-
-```bash
-rye add parallel-download
-```
-
-### Using pip
+### pip
 
 ```bash
-pip install parallel-download
+pip install git+https://github.com/devcomfort/parallel_download.git
 ```
 
-## 🚀 Quick Start
+### uv
 
-### Basic Usage
+```bash
+uv add git+https://github.com/devcomfort/parallel_download.git
+```
+
+### rye
+
+```bash
+rye add parallel-download --git https://github.com/devcomfort/parallel_download.git
+```
+
+특정 버전(태그)을 설치하려면:
+
+```bash
+# pip
+pip install git+https://github.com/devcomfort/parallel_download.git@v0.1.0
+
+# uv
+uv add git+https://github.com/devcomfort/parallel_download.git --tag v0.1.0
+
+# rye
+rye add parallel-download --git https://github.com/devcomfort/parallel_download.git --tag v0.1.0
+```
+
+`requirements.txt`에 추가할 경우:
+
+```text
+parallel-download @ git+https://github.com/devcomfort/parallel_download.git
+```
+
+## Quick Start
 
 ```python
 import asyncio
 from pathlib import Path
-from parallel_download.downloader import Downloader
-from parallel_download.models import DownloadRequest
+from parallel_download import Downloader
 
 async def main():
-    # Create downloader (timeout: 60s, concurrency: 5)
     downloader = Downloader(
         out_dir=Path("./downloads"),
         timeout=60,
-        max_concurrent=5
+        max_concurrent=5,
     )
 
-    # Create download requests
-    requests = [
-        DownloadRequest(
-            url="https://example.com/file1.pdf",
-            filename="file1.pdf"
-        ),
-        DownloadRequest(
-            url="https://example.com/file2.pdf",
-            filename="file2.pdf"
-        ),
-    ]
+    results = await downloader.download([
+        "https://example.com/file1.pdf",
+        "https://example.com/file2.csv",
+        {"url": "https://example.com/data", "filename": "data.json"},
+    ])
 
-    # Download in parallel
-    results = await downloader.download(requests)
-
-    # Process results
-    for result in results:
-        if result.status == "success":
-            print(f"✓ Downloaded: {result.filename} to {result.file_path}")
+    for r in results:
+        if r.status == "success":
+            print(f"✓ {r.filename} → {r.file_path}")
         else:
-            print(f"✗ Failed: {result.filename} - {result.error}")
+            print(f"✗ {r.filename}: {r.error}")
 
 asyncio.run(main())
 ```
 
-### Automatic Filename Extraction
+## 입력 형식
 
-The library auto-extracts filenames, but strictly rejects ambiguous or unsafe URLs.
-
-```python
-from parallel_download.models import DownloadRequest
-
-# ✅ Valid Cases
-DownloadRequest(url="https://example.com/report.pdf")               # filename="report.pdf"
-DownloadRequest(url="https://example.com/files/my%20doc.pdf")       # filename="my doc.pdf"
-DownloadRequest(url="https://example.com/data/", filename="d.zip")  # filename="d.zip" (explicit override works)
-
-# ❌ Invalid Cases (Raises Error)
-DownloadRequest(url="https://example.com")         # Error: NoPathInURLError (No filename in path)
-DownloadRequest(url="https://example.com/data/")   # Error: DirectoryPathError (Path ends with /)
-```
-
-#### Design Philosophy
-
-We force errors instead of guessing (e.g., `download.bin`) to ensure data traceability and prevent hidden bugs in automated workflows.
-
-## 📖 Usage Guide
-
-### Timeout Configuration
-
-You can configure the timeout in seconds (integer).
+`Downloader.download()`는 세 가지 입력 형식을 지원합니다:
 
 ```python
-# Default is 60 seconds
-downloader = Downloader(out_dir=Path("."), timeout=60)
+# 1. URL 문자열 — 파일명 자동 추출
+"https://example.com/report.pdf"
 
-# Custom timeout
-downloader = Downloader(out_dir=Path("."), timeout=120)
+# 2. 딕셔너리 — 파일명 지정 가능
+{"url": "https://example.com/data", "filename": "data.json"}
+
+# 3. DownloadRequest 객체
+DownloadRequest(url="https://example.com/file.zip")
 ```
 
-### Error Handling Pattern
+파일명이 지정되지 않으면 URL 경로에서 자동 추출됩니다.
+파일명을 추출할 수 없는 URL(`https://example.com`, `https://example.com/dir/`)은
+추측하지 않고 명시적 에러를 발생시킵니다.
 
-Results are explicit objects (`DownloadSuccess` or `DownloadFailure`).
+## API
+
+### `Downloader`
 
 ```python
-results = await downloader.download(requests)
-
-for res in results:
-    if res.status == "success":
-        print(f"✅ Saved: {res.file_path}")
-    else:
-        # res is DownloadFailure
-        print(f"❌ Failed: {res.error} (URL: {res.url})")
+Downloader(
+    out_dir: str | Path,      # 다운로드 저장 디렉토리
+    timeout: int = 60,        # HTTP 요청 타임아웃 (초)
+    max_concurrent: int = 5,  # 최대 동시 다운로드 수
+)
 ```
 
-## 🔌 API Reference
+| Method                              | Description                                                         |
+| ----------------------------------- | ------------------------------------------------------------------- |
+| `await download(requests)`          | 병렬 다운로드 실행, `list[DownloadSuccess \| DownloadFailure]` 반환 |
+| `await validate_requests(requests)` | 다운로드 없이 요청만 검증, `list[DownloadRequest]` 반환             |
 
-### Downloader
-
-Main class for parallel downloads.
+### 결과 타입
 
 ```python
-class Downloader:
-    def __init__(
-        self,
-        out_dir: Path,
-        timeout: int = 60,
-        max_concurrent: int = 5,
-    ) -> None:
-        """
-        Initialize the parallel downloader.
+# 성공
+DownloadSuccess(
+    url="https://...",
+    filename="file.pdf",
+    file_path="/path/to/file.pdf",
+    status="success",
+)
 
-        Args:
-            out_dir: Output directory for downloaded files
-            timeout: Timeout in seconds (default: 60)
-            max_concurrent: Maximum concurrent downloads (must be positive)
-
-        Raises:
-            ValueError: If timeout or max_concurrent are invalid
-        """
-
-    async def download(
-        self,
-        requests: Iterable[DownloadRequest]
-    ) -> list[DownloadSuccess | DownloadFailure]:
-        """
-        Download files in parallel.
-
-        Args:
-            requests: Iterable of DownloadRequest objects
-
-        Returns:
-            List of download results (success or failure)
-        """
+# 실패
+DownloadFailure(
+    url="https://...",
+    filename="file.pdf",
+    error="Download timed out after 60s",
+    status="failed",
+)
 ```
 
-### DownloadRequest
+`status` 필드를 판별자(discriminator)로 사용하는 Pydantic Discriminated Union입니다.
 
-Request object for a single file download.
+### 예외
+
+| Exception              | Description                               |
+| ---------------------- | ----------------------------------------- |
+| `NoPathInURLError`     | URL에 경로가 없음                         |
+| `DirectoryPathError`   | URL 경로가 디렉토리(`/`로 끝남)           |
+| `HTTPError`            | HTTP 응답이 2xx가 아님                    |
+| `DownloadTimeoutError` | 요청 타임아웃 초과                        |
+| `NetworkError`         | 네트워크 연결 실패                        |
+| `FileWriteError`       | 파일 쓰기 실패                            |
+| `BulkValidationError`  | 배치 검증 시 복수 에러 (`ExceptionGroup`) |
+
+## 예제
+
+### 결과 처리
 
 ```python
-@dataclass
-class DownloadRequest:
-    url: str                      # Download URL
-    filename: Optional[str] = None # Target filename (auto-extracted if None)
+from parallel_download import DownloadSuccess, DownloadFailure
 
-    # Raises:
-    # - NoPathInURLError: If URL has no path
-    # - DirectoryPathError: If URL path is a directory
+results = await downloader.download(urls)
+
+successes = [r for r in results if isinstance(r, DownloadSuccess)]
+failures = [r for r in results if isinstance(r, DownloadFailure)]
+
+print(f"성공: {len(successes)}, 실패: {len(failures)}")
+for f in failures:
+    print(f"  {f.filename}: {f.error}")
 ```
 
-### Download Results
-
-#### DownloadSuccess
+### 요청 사전 검증
 
 ```python
-@dataclass
-class DownloadSuccess:
-    url: str              # Source URL
-    filename: str         # Target filename
-    file_path: str        # Full path to downloaded file
-    status: Literal["success"] = "success"
+from parallel_download import BulkValidationError
+
+try:
+    valid = await downloader.validate_requests([
+        "https://example.com/file.pdf",
+        "https://example.com",  # 에러: 경로 없음
+    ])
+except BulkValidationError as e:
+    for err in e.exceptions:
+        print(f"검증 실패: {err}")
 ```
 
-#### DownloadFailure
+### 재시도 패턴
 
 ```python
-@dataclass
-class DownloadFailure:
-    url: str              # Source URL
-    filename: str         # Target filename
-    error: str            # Error message
-    status: Literal["failed"] = "failed"
+async def download_with_retry(downloader, url, retries=3):
+    for attempt in range(retries):
+        result = (await downloader.download([url]))[0]
+        if result.status == "success":
+            return result
+        if attempt < retries - 1:
+            await asyncio.sleep(2 ** attempt)  # exponential backoff
+    return result
 ```
 
-### Custom Exceptions
+## 개발
 
-```python
-class FilenameExtractionError(Exception)
-    """Base exception for filename extraction errors"""
-
-class NoPathInURLError(FilenameExtractionError)
-    """URL has no path information"""
-
-class DirectoryPathError(FilenameExtractionError)
-    """URL path points to a directory"""
-
-class DownloadError(Exception)
-    """Base exception for download errors"""
-
-class HTTPError(DownloadError)
-    """HTTP request returned non-2xx status"""
-
-class DownloadTimeoutError(DownloadError)
-    """Download request timed out"""
-
-class NetworkError(DownloadError)
-    """Network error during download"""
-
-class FileWriteError(DownloadError)
-    """Error writing file to disk"""
-```
-
-## 📚 Examples
-
-### Download Multiple Files with Progress Tracking
-
-```python
-import asyncio
-from pathlib import Path
-from parallel_download.downloader import Downloader
-from parallel_download.models import DownloadRequest, DownloadSuccess, DownloadFailure
-
-async def download_with_progress():
-    downloader = Downloader(
-        out_dir=Path("./downloads"),
-        timeout=60,
-        max_concurrent=5
-    )
-
-    urls = [
-        ("https://example.com/file1.pdf", "file1.pdf"),
-        ("https://example.com/file2.pdf", "file2.pdf"),
-        ("https://example.com/file3.pdf", "file3.pdf"),
-    ]
-
-    requests = [
-        DownloadRequest(url=url, filename=filename)
-        for url, filename in urls
-    ]
-
-    results = await downloader.download(requests)
-
-    # Summary
-    successes = [r for r in results if isinstance(r, DownloadSuccess)]
-    failures = [r for r in results if isinstance(r, DownloadFailure)]
-
-    print(f"\n✓ Downloaded: {len(successes)}/{len(results)}")
-    if failures:
-        print(f"✗ Failed: {len(failures)}")
-        for failure in failures:
-            print(f"  - {failure.filename}: {failure.error}")
-
-asyncio.run(download_with_progress())
-```
-
-### Batch Processing with Custom Timeouts
-
-```python
-async def batch_download(file_size_category: str):
-    # Select timeout based on file size
-    timeout_map = {
-        "small": 15,
-        "medium": 60,
-        "large": 300,
-    }
-
-    downloader = Downloader(
-        out_dir=Path(f"./downloads/{file_size_category}"),
-        timeout=timeout_map[file_size_category],
-    )
-
-    requests = [
-        DownloadRequest(url=f"https://example.com/{i}.bin", filename=f"file_{i}.bin")
-        for i in range(10)
-    ]
-
-    results = await downloader.download(requests)
-    return results
-
-# Download large files with optimized settings
-asyncio.run(batch_download("large"))
-```
-
-### Error Recovery with Retry Logic
-
-```python
-from parallel_download.errors import NetworkError, HTTPError
-
-async def download_with_retry(url: str, filename: str, max_retries: int = 3):
-    for attempt in range(max_retries):
-        try:
-            downloader = Downloader(out_dir=Path("./downloads"))
-            result = (await downloader.download([
-                DownloadRequest(url=url, filename=filename)
-            ]))[0]
-
-            if isinstance(result, DownloadSuccess):
-                return result
-
-            # Retry on network errors
-            if "Network error" in result.error or "timeout" in result.error.lower():
-                if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt  # Exponential backoff
-                    print(f"Retry in {wait_time}s...")
-                    await asyncio.sleep(wait_time)
-                    continue
-
-            raise Exception(f"Download failed: {result.error}")
-
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise
-            print(f"Attempt {attempt + 1} failed: {e}")
-
-asyncio.run(download_with_retry("https://example.com/file.pdf", "file.pdf"))
-```
-
-## 🧪 Development
-
-### Setup Development Environment
+### 환경 설정
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/parallel-download.git
-cd parallel-download
-
-# Sync with rye
+git clone https://github.com/devcomfort/parallel_download.git
+cd parallel_download
 rye sync
-
-# Activate virtual environment (optional)
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-### Running Tests
+### 테스트
 
 ```bash
-# Run all tests (includes coverage report by default)
-rye run pytest
-
-# Run specific test file
-rye run pytest tests/test_downloader.py
-
-# Run specific test class
-rye run pytest tests/test_downloader.py::TestDownloaderInitializationValidation
-
-# Run tests in verbose mode
-rye run pytest -vv
+rye run pytest                    # 전체 테스트 + 커버리지
+rye run pytest tests/test_downloader.py  # 특정 파일
+rye run pytest -k "test_timeout"  # 패턴 매칭
 ```
 
-### Test Coverage
-
-The project includes 72 comprehensive tests:
-
-- **DownloadRequest**: Filename extraction, URL parsing, and error handling
-- **Downloader Configuration**: Initialization validation (timeouts, parameter checks)
-- **Downloader Functionality**: Basic downloads, parallel execution, edge cases, and full-factorial scenarios
-
-### Code Quality
+### 코드 품질
 
 ```bash
-# Format code with black
-rye run black src tests
-
-# Check style with flake8
-rye run flake8 src tests
-
-# Type check with mypy
-rye run mypy src
+rye run ruff check src tests      # 린트
+rye run ruff format src tests     # 포맷
+rye run mypy src                  # 타입 체크
 ```
 
-### Project Structure
+### 프로젝트 구조
 
 ```
-parallel-download/
+parallel_download/
 ├── src/parallel_download/
-│   ├── __init__.py           # Package exports
-│   ├── downloader.py         # Main Downloader class
-│   ├── errors/               # Custom exceptions
-│   ├── filesystem/           # File system operations
-│   ├── models/               # Data models (Request/Result)
-│   └── url_processor/        # URL handling Iogic
-├── tests/
-│   ├── conftest.py           # Pytest fixtures
-│   ├── test_downloader.py    # Downloader tests
-│   ├── test_directory.py     # Directory tests
-│   └── test_download_request.py # Request tests
-├── examples/                 # Example scripts
-│   ├── __init__.py
-│   └── demo_download.py      # Demo script
-├── pyproject.toml            # Project configuration
-├── README.md                 # This file
-└── TESTING.md                # Testing guide
+│   ├── __init__.py          # 패키지 exports
+│   ├── downloader.py        # Downloader 클래스
+│   ├── errors/              # 계층적 예외 클래스
+│   ├── filesystem/          # 디렉토리 관리
+│   ├── models/              # DownloadRequest, Result 모델
+│   └── url_processor/       # URL 파싱, 파일명 추출
+├── tests/                   # 91개 테스트 (100% coverage)
+├── examples/                # 데모 스크립트
+└── pyproject.toml           # 프로젝트 설정
 ```
 
-### Contributing
+## License
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes and add tests
-4. Run tests to ensure everything passes
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+[MIT](LICENSE)
 
-## 📚 Examples
+## Author
 
-### Preview Downloads with dry_run
-
-The library provides a `download_dry` method to preview downloads without performing actual HTTP requests. This is useful for validating requests before batch downloads.
-
-**Example with tabulate output:**
-
-```python
-import asyncio
-from pathlib import Path
-from parallel_download.downloader import Downloader
-from parallel_download.models import DownloadRequest
-from tabulate import tabulate
-
-async def preview_downloads():
-    downloader = Downloader(out_dir=Path("./downloads"))
-
-    requests = [
-        DownloadRequest(url="https://example.com/file1.pdf", filename="file1.pdf"),
-        DownloadRequest(url="https://example.com/file2.csv", filename="file2.csv"),
-        DownloadRequest(url="https://example.com/file3.zip", filename="bad/path/file3.zip"),  # Invalid
-    ]
-
-    # Preview without downloading
-    previews = await downloader.download_dry(requests)
-
-    # Prepare table data
-    table_data = []
-    for preview in previews:
-        status_icon = "✓" if preview.status == "valid" else "✗"
-        reason = preview.reason if preview.reason else "-"
-        table_data.append([
-            status_icon,
-            preview.filename,
-            preview.status.upper(),
-            reason,
-        ])
-
-    # Display results
-    print(tabulate(
-        table_data,
-        headers=["Status", "Filename", "Validation", "Error/Notes"],
-        tablefmt="grid"
-    ))
-
-asyncio.run(preview_downloads())
-```
-
-**Output:**
-
-```
-┌────────┬──────────────────────┬────────────┬──────────────────────────────────┐
-│ Status │ Filename             │ Validation │ Error/Notes                      │
-├────────┼──────────────────────┼────────────┼──────────────────────────────────┤
-│ ✓      │ file1.pdf            │ VALID      │ -                                │
-│ ✓      │ file2.csv            │ VALID      │ -                                │
-│ ✗      │ bad/path/file3.zip   │ INVALID    │ Filename cannot contain path ... │
-└────────┴──────────────────────┴────────────┴──────────────────────────────────┘
-```
-
-For more comprehensive examples, see the `examples/download_dry_preview.py` file:
-
-```bash
-pip install tabulate
-python examples/download_dry_preview.py
-```
-
-This demonstrates:
-
-- Basic dry_run preview with table output
-- Batch processing and reporting
-- Filtering valid/invalid requests
-- Summary statistics
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 👤 Author
-
-**DevComfort**
-
-- GitHub: [@devcomfort](https://github.com/devcomfort)
-- Email: im@devcomfort.me
-
-## 🤝 Acknowledgments
-
-- Built with [aiohttp](https://docs.aiohttp.org/) for HTTP requests
-- Uses [aiofiles](https://github.com/Tinche/aiofiles) for async file operations
-- Tested with [pytest](https://pytest.org/) and [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)
-
-## 📞 Support
-
-For issues, questions, or suggestions, please [open an issue](https://github.com/devcomfort/parallel-download/issues) on GitHub.
+**DevComfort** — [GitHub](https://github.com/devcomfort) · [Email](mailto:im@devcomfort.me)
