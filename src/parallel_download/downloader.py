@@ -163,7 +163,9 @@ class Downloader:
         url_str = str(request.url)
 
         # filename should be guaranteed by normalization, but check for type safety
-        if not request.filename:  # pragma: no cover — DownloadRequest는 frozen 모델이며 model_validator가 항상 filename을 채움; 방어적 코드
+        if not request.filename:  # pragma: no cover
+            # DownloadRequest는 frozen 모델이며 model_validator가 항상 filename을 채움
+            # 방어적 코드
             return DownloadFailure(
                 url=url_str,
                 filename="unknown",

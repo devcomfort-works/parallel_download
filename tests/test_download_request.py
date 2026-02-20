@@ -3,19 +3,16 @@ Tests for DownloadRequest model and filename extraction.
 DownloadRequest 모델 및 파일명 추출에 대한 테스트입니다.
 """
 
-import asyncio
 import pytest
-from unittest.mock import patch
-from exceptiongroup import ExceptionGroup
 
 from parallel_download.errors import (
     BulkValidationError,
     DirectoryPathError,
-    NoPathInURLError,
-    HTTPError,
     DownloadTimeoutError,
-    NetworkError,
     FileWriteError,
+    HTTPError,
+    NetworkError,
+    NoPathInURLError,
 )
 from parallel_download.models import DownloadRequest
 from parallel_download.models.request import normalize_request
@@ -110,7 +107,7 @@ class TestDownloadRequestModelValidator:
 
     def test_normalize_request_function_with_request_object(self):
         """Test normalize_request function with DownloadRequest object"""
-        original_req = DownloadRequest(url="https://example.com/file.txt")
+        original_req = DownloadRequest.model_validate("https://example.com/file.txt")
         result = normalize_request(original_req)
         assert result is original_req  # Should return same object
 
