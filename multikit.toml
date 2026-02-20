@@ -1,0 +1,29 @@
+[multikit]
+version = "0.1.0"
+registry_url = "https://raw.githubusercontent.com/devcomfort/multikit/main/kits"
+
+[multikit.kits.testkit]
+version = "1.0.0"
+source = "remote"
+files = [
+    "agents/testkit.testdesign.agent.md",
+    "agents/testkit.testcoverage.agent.md",
+    "prompts/testkit.testdesign.prompt.md",
+    "prompts/testkit.testcoverage.prompt.md",
+]
+
+[multikit.kits.gitkit]
+version = "1.0.0"
+source = "remote"
+files = [
+    "agents/gitkit.commit.agent.md",
+    "prompts/gitkit.commit.prompt.md",
+]
+
+[multikit.kits.lintkit]
+version = "1.0.0"
+source = "remote"
+files = [
+    "agents/lintkit.analyze.agent.md",
+    "prompts/lintkit.analyze.prompt.md",
+]
