@@ -1,13 +1,14 @@
+# mypy: disable-error-code=import-untyped
+
 import asyncio
 import time
 from pathlib import Path
 from shutil import rmtree
 
 from parallel_download.downloader import Downloader
-from parallel_download.models import DownloadRequest
 
 
-async def run_test(name: str, max_concurrent: int, urls: list[str], output_dir: Path):
+async def run_test(name: str, max_concurrent: int, urls: list[str], output_dir: Path) -> float:
     print(f"\n🧪 {name} 테스트 시작 (동시성: {max_concurrent})...")
 
     # 디렉토리 초기화 (테스트 공정성을 위해 삭제 후 재생성)
@@ -18,14 +19,14 @@ async def run_test(name: str, max_concurrent: int, urls: list[str], output_dir: 
     downloader = Downloader(out_dir=output_dir, timeout=60, max_concurrent=max_concurrent)
 
     # 중복 파일명 방지를 위해 파일명 지정 (file_01.ext)
-    requests = []
+    requests: list[dict[str, str]] = []
     for i, url in enumerate(urls):
         # 간단한 확장자 추출 (실제로는 더 복잡할 수 있음)
         ext = url.split(".")[-1]
         if len(ext) > 4 or "/" in ext:
             ext = "download"
         filename = f"file_{i:02d}.{ext}"
-        requests.append(DownloadRequest(url=url, filename=filename))
+        requests.append({"url": url, "filename": filename})
 
     start_time = time.perf_counter()
     results = await downloader.download(requests)
@@ -41,7 +42,7 @@ async def run_test(name: str, max_concurrent: int, urls: list[str], output_dir: 
     return duration
 
 
-async def main():
+async def main() -> None:
     # 테스트용 URL 목록 (가벼운 파일들 위주로 구성)
     base_urls = [
         "https://raw.githubusercontent.com/devcomfort/parallel_download/main/README.md",
