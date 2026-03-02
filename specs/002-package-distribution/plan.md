@@ -1,7 +1,7 @@
-# Implementation Plan: Library Distribution
+# Implementation Plan: Package Distribution
 
-**Branch**: `002-library-distribution` | **Date**: 2026-02-03 | **Spec**: [Spec](spec.md)
-**Input**: Feature specification from `/specs/002-library-distribution/spec.md`
+**Branch**: `002-package-distribution` | **Date**: 2026-02-03 | **Spec**: [Spec](spec.md)
+**Input**: Feature specification from `/specs/002-package-distribution/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
@@ -40,7 +40,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 ### Documentation (this feature)
 
 ```text
-specs/002-library-distribution/
+specs/002-package-distribution/
 ├── plan.md              # This file
 ├── research.md          # Research findings
 └── tasks.md             # Implementation tasks

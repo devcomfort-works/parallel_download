@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Library Distribution
+# Specification Quality Checklist: Package Distribution
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-02-02

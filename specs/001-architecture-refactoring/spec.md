@@ -1,6 +1,6 @@
-# Feature Specification: Project Structure
+# Feature Specification: Architecture Refactoring
 
-**Feature Branch**: `001-project-structure`  
+**Feature Branch**: `001-architecture-refactoring`  
 **Created**: 2026-02-02  
 **Status**: Draft  
 **Input**: User description: "Refactor: Modularize Codebase Structure. Refactoring the monolithic structure into logical submodules (models, errors, url_processor) to improve maintainability and separation of concerns."

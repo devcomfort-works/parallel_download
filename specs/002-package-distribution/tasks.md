@@ -1,6 +1,6 @@
-# Tasks: Library Distribution
+# Tasks: Package Distribution
 
-**Feature**: Library Distribution
+**Feature**: Package Distribution
 **Status**: In Progress
 **Spec**: [Spec](spec.md)
 

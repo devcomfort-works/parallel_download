@@ -1,6 +1,10 @@
 """
-Tests for DownloadRequest model and filename extraction.
-DownloadRequest 모델 및 파일명 추출에 대한 테스트입니다.
+DownloadRequest 입력 정규화와 URL 파일명 추출 규칙을 검증한다.
+
+주요 범위:
+- DownloadRequest 검증/정규화
+- URL 기반 파일명 추출 성공/실패 케이스
+- 관련 예외 및 에러 객체 계약
 """
 
 import pytest
@@ -20,7 +24,7 @@ from parallel_download.url_processor import extract_filename_from_url
 
 
 class TestBulkValidationError:
-    """Test BulkValidationError coverage for validation_errors.py"""
+    """배치 검증 예외(BulkValidationError)의 기본 계약을 검증한다."""
 
     def test_bulk_validation_error_creation(self):
         """Test BulkValidationError can be instantiated and raised."""
@@ -33,7 +37,7 @@ class TestBulkValidationError:
 
 
 class TestDownloadErrors:
-    """Test coverage for download_errors.py"""
+    """다운로드 에러 객체들이 메타데이터를 보존하는지 검증한다."""
 
     def test_http_error_creation(self):
         """Test HTTPError can be instantiated."""
@@ -67,7 +71,7 @@ class TestDownloadErrors:
 
 
 class TestExtractFilenameFromUrlCoverage:
-    """Test coverage for extract_filename_from_url.py"""
+    """URL 인코딩/특수문자 환경에서 파일명 추출 규칙을 검증한다."""
 
     def test_extract_filename_with_url_encoded_characters(self):
         """Test extract_filename_from_url with URL-encoded characters"""
@@ -93,7 +97,7 @@ class TestExtractFilenameFromUrlCoverage:
 
 
 class TestDownloadRequestModelValidator:
-    """Test coverage for DownloadRequest model validator"""
+    """DownloadRequest model validator의 입력 정규화/오류 처리를 검증한다."""
 
     def test_normalize_request_with_dict_missing_url(self):
         """Test normalize_request with dict missing url raises ValueError"""
@@ -113,7 +117,7 @@ class TestDownloadRequestModelValidator:
 
 
 class TestDownloadRequestModelValidatorRemaining:
-    """Test remaining coverage for DownloadRequest model validator"""
+    """validator의 보조 오류 경로를 추가 검증한다."""
 
     def test_normalize_request_with_invalid_input_type(self):
         """Test normalize_request with unsupported input type"""
@@ -123,8 +127,11 @@ class TestDownloadRequestModelValidatorRemaining:
 
 class TestDownloadRequestNormalization:
     """
-    Tests for DownloadRequest model input normalization.
-    DownloadRequest 모델 입력 정규화에 대한 테스트입니다.
+    DownloadRequest 생성 시 입력이 어떻게 정규화되는지 검증한다.
+
+    - 명시적 filename 우선
+    - URL 기반 자동 filename 추출
+    - 자동 추출값 오버라이드
     """
 
     def test_explicit_filename(self):
@@ -167,8 +174,9 @@ class TestDownloadRequestNormalization:
 
 class TestFilenameExtractionLogic:
     """
-    Tests for direct filename extraction logic (using extract_filename_from_url).
-    직접 파일명 추출 로직에 대한 테스트입니다.
+    `extract_filename_from_url`의 정상 추출 규칙을 검증한다.
+
+    쿼리/프래그먼트 무시, URL decode, 다양한 경로 패턴을 포함한다.
     """
 
     def test_extract_with_query_string(self):
@@ -229,8 +237,9 @@ class TestFilenameExtractionLogic:
 
 class TestFilenameExtractionErrors:
     """
-    Tests for error scenarios in filename extraction.
-    파일명 추출 시 오류 시나리오에 대한 테스트입니다.
+    파일명을 추출할 수 없는 URL 입력에 대한 오류 경로를 검증한다.
+
+    경로 없음, 디렉터리 경로, 모델 검증 단계 전파를 포함한다.
     """
 
     def test_error_no_path(self):
@@ -281,7 +290,7 @@ class TestFilenameExtractionErrors:
 
 
 class TestNormalizeRequestFunction:
-    """Tests for normalize_request() function with non-DownloadRequest inputs."""
+    """`normalize_request()`가 다양한 입력 타입을 일관된 모델로 변환하는지 검증한다."""
 
     def test_normalize_request_with_string(self):
         """Test normalize_request with a plain URL string."""
@@ -303,7 +312,7 @@ class TestNormalizeRequestFunction:
 
 
 class TestRequestParserSingleInput:
-    """Tests for RequestParser.parse() with single (non-list) input."""
+    """`RequestParser.parse()`가 단일 입력(str/dict)도 허용하는지 검증한다."""
 
     def test_parse_single_string_input(self):
         """Test parse() accepts a single string instead of a list."""

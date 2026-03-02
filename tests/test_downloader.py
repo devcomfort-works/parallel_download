@@ -1,4 +1,4 @@
-"""Tests for Downloader class."""
+"""Downloader의 초기화, 다운로드 실행, 예외 처리, 검증 경로를 포괄 검증한다."""
 
 import asyncio
 from pathlib import Path
@@ -17,7 +17,7 @@ from parallel_download.models import (
 
 
 class TestDownloaderInitializationValidation:
-    """Tests for Downloader initialization parameter validation."""
+    """생성자 파라미터(timeout/max_concurrent) 검증 계약을 테스트한다."""
 
     def test_downloader_default_timeout(self, temp_download_dir: Path):
         """Test Downloader initialization with default timeout."""
@@ -70,7 +70,7 @@ class TestDownloaderInitializationValidation:
 
 
 class TestDownloaderBasic:
-    """Basic tests for Downloader initialization and simple downloads."""
+    """다운로더의 기본 동작(초기화/단일 다운로드)을 검증한다."""
 
     def test_downloader_initialization(self, temp_download_dir: Path):
         """Test Downloader initialization."""
@@ -133,7 +133,7 @@ class TestDownloaderBasic:
 
 
 class TestDownloaderParallel:
-    """Tests for parallel download functionality."""
+    """복수 요청에 대한 병렬 다운로드 동작을 검증한다."""
 
     @pytest.mark.asyncio
     async def test_download_multiple_files(self, temp_download_dir: Path, httpbin_urls: dict):
@@ -173,7 +173,7 @@ class TestDownloaderParallel:
 
 
 class TestDownloaderFullFactorial:
-    """Full factorial test design for comprehensive coverage."""
+    """주요 인자 조합을 전수에 가깝게 탐색하는 factorial 시나리오 테스트."""
 
     @pytest.mark.asyncio
     async def test_factorial_download_variations(
@@ -308,7 +308,7 @@ class TestDownloaderFullFactorial:
 
 
 class TestDownloaderEdgeCases:
-    """Test edge cases and error conditions."""
+    """읽기 전용 경로/빈 요청 등 경계 및 예외성 케이스를 검증한다."""
 
     @pytest.mark.asyncio
     async def test_download_to_readonly_directory(self, httpbin_urls: dict):
@@ -367,7 +367,7 @@ class TestDownloaderEdgeCases:
 
 
 class TestDownloaderValidation:
-    """Tests for Downloader request validation functionality."""
+    """`validate_requests()`의 성공/실패 분기와 URL 보존 동작을 검증한다."""
 
     @pytest.mark.asyncio
     async def test_validate_requests_valid(self, temp_download_dir: Path):
@@ -446,7 +446,7 @@ class TestDownloaderValidation:
 
 
 class TestDownloaderExceptionHandlers:
-    """Tests for _download_file exception handling branches in downloader.py."""
+    """`_download_file()` 내부 예외 핸들러 분기가 실패 결과로 매핑되는지 검증한다."""
 
     @pytest.mark.asyncio
     async def test_timeout_error_returns_failure(self, tmp_path: Path):

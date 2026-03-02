@@ -1,6 +1,6 @@
-# Feature Specification: Library Distribution
+# Feature Specification: Package Distribution
 
-**Feature Branch**: `002-library-distribution`  
+**Feature Branch**: `002-package-distribution`  
 **Created**: 2026-02-02  
 **Status**: Draft  
 **Input**: User description: "Check test coverage, update README, and prepare package distribution"
