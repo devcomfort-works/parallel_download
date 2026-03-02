@@ -1,7 +1,7 @@
-# Implementation Plan: Project Structure
+# Implementation Plan: Architecture Refactoring
 
-**Branch**: `001-project-structure` | **Date**: 2026-02-02 | **Spec**: [Spec](spec.md)
-**Input**: Feature specification from `specs/001-project-structure/spec.md`
+**Branch**: `001-architecture-refactoring` | **Date**: 2026-02-02 | **Spec**: [Spec](spec.md)
+**Input**: Feature specification from `specs/001-architecture-refactoring/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
@@ -50,12 +50,12 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Compliance**: ✅
 - **Notes**: `black`, `isort`, `flake8` must pass on new structure.
 
-## Project Structure
+## Architecture Refactoring
 
 ### Documentation (this feature)
 
 ```text
-specs/001-project-structure/
+specs/001-architecture-refactoring/
 ├── plan.md              # This file
 ├── spec.md              # Feature Spec
 └── checklists/
