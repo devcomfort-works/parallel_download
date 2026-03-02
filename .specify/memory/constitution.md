@@ -44,9 +44,7 @@ Silent failures are forbidden. Operations must return structured result objects 
 
 Code must strictly adhere to the project's formatting and linting rules.
 
-- Format with `black`.
-- Sort imports with `isort`.
-- Lint with `flake8`.
+- Lint and format with `ruff`.
 - Commit hooks should ensure these standards are met before push.
 
 ## Development Standards
