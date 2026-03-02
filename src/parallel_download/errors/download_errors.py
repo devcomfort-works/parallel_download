@@ -1,5 +1,7 @@
 """Download operation related errors."""
 
+from typing import Optional
+
 
 class DownloadError(Exception):
     """
@@ -84,3 +86,25 @@ class FileWriteError(DownloadError):
         self.filename = filename
         self.original_error = original_error
         super().__init__(f"Failed to write data to file '{filename}': {original_error}")
+
+
+class DirectoryPermissionError(DownloadError):
+    """
+    Raised when the output directory cannot be created due to insufficient permissions.
+    권한 부족으로 출력 디렉토리를 생성할 수 없을 때 발생합니다.
+
+    Attributes
+    ----------
+    path : str
+        The directory path that could not be created.
+        생성할 수 없었던 디렉토리 경로입니다.
+    original_error : Exception or None
+        The underlying OS exception (e.g., PermissionError).
+        원본 OS 예외입니다.
+    """
+
+    def __init__(self, path: str, original_error: Optional[Exception] = None):
+        self.path = path
+        self.original_error = original_error
+        detail = str(original_error) if original_error else "Permission denied"
+        super().__init__(f"Cannot write to directory '{path}': {detail}")

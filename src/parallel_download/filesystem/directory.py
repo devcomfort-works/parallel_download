@@ -4,6 +4,8 @@ from pathlib import Path
 from shutil import rmtree
 from typing import Union
 
+from parallel_download.errors.download_errors import DirectoryPermissionError
+
 
 class Directory:
     """
@@ -43,8 +45,17 @@ class Directory:
         bool
             True if the directory exists (or was created), False otherwise.
             디렉토리가 존재하거나 생성되었으면 True, 그렇지 않으면 False를 반환합니다.
+
+        Raises
+        ------
+        DirectoryPermissionError
+            If the directory cannot be created due to insufficient permissions.
+            권한 부족으로 디렉토리를 생성할 수 없을 때 발생합니다.
         """
-        self.path.mkdir(parents=True, exist_ok=True)
+        try:
+            self.path.mkdir(parents=True, exist_ok=True)
+        except PermissionError as e:
+            raise DirectoryPermissionError(path=str(self.path), original_error=e) from e
         return self.path.is_dir()
 
     def clear(self, reset: bool = False) -> bool:

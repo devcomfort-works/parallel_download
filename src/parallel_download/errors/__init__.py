@@ -1,6 +1,7 @@
 """Core error classes for parallel_download."""
 
 from .download_errors import (
+    DirectoryPermissionError,
     DownloadError,
     DownloadTimeoutError,
     FileWriteError,
@@ -21,6 +22,7 @@ __all__ = [
     "NoPathInURLError",
     "DirectoryPathError",
     "DownloadError",
+    "DirectoryPermissionError",
     "HTTPError",
     "DownloadTimeoutError",
     "NetworkError",

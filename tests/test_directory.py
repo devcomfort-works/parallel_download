@@ -1,13 +1,17 @@
-"""Tests for Directory class."""
+"""Filesystem Directory 유틸리티의 생성/정리 동작을 검증하는 테스트 모음."""
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
+
+from parallel_download.errors.download_errors import DirectoryPermissionError
 from parallel_download.filesystem.directory import Directory
 
 
 class TestDirectoryEnsure:
-    """Tests for Directory.ensure method."""
+    """`Directory.ensure()`가 경로를 안전하게 보장하는지 검증한다."""
 
     def test_ensure_existing_directory(self):
         """Test ensure on existing directory."""
@@ -59,7 +63,7 @@ class TestDirectoryEnsure:
 
 
 class TestDirectoryClear:
-    """Tests for Directory.clear method."""
+    """`Directory.clear()`의 reset 옵션별 동작을 검증한다."""
 
     def test_clear_existing_directory_no_reset(self):
         """Test clear on existing directory with reset=False."""
@@ -104,3 +108,35 @@ class TestDirectoryClear:
             assert not (path / "subdir").exists()
             # Check if directory is empty
             assert len(list(path.iterdir())) == 0
+
+
+class TestDirectoryEnsureErrorWrapping:
+    """`Directory.ensure()`의 PermissionError 도메인 에러 래핑을 검증한다."""
+
+    def test_ensure_permission_error_raises_domain_error(self):
+        """PermissionError 발생 시 DirectoryPermissionError로 래핑되는지 확인."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "restricted"
+            d = Directory(path)
+
+            with patch.object(Path, "mkdir", side_effect=PermissionError("Permission denied")):
+                with pytest.raises(DirectoryPermissionError) as exc_info:
+                    d.ensure()
+
+                assert str(path) in str(exc_info.value)
+                assert exc_info.value.path == str(path)
+                assert isinstance(exc_info.value.original_error, PermissionError)
+                assert exc_info.value.__cause__ is exc_info.value.original_error
+
+    def test_ensure_on_non_existing_nested_path(self):
+        """깊은 중첩 경로(a/b/c/d/e)에서 ensure() 후 디렉토리 존재 확인."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "a" / "b" / "c" / "d" / "e"
+            assert not path.exists()
+
+            d = Directory(path)
+            result = d.ensure()
+
+            assert result is True
+            assert path.exists()
+            assert path.is_dir()
